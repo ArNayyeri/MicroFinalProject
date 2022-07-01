@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "LiquidCrystal.h"
 #include "stdio.h"
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,13 +54,111 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+int state_7segment = 0;
+int score = 123;
+int difficulty = 4;
 
 void show_menu();
 
+void reset_port_7segment() {
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, 0);
+
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, 0);
+
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, 0);
+
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0);
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_7, 0);
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, 0);
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, 0);
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_10, 0);
+
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, 1);
+
+}
+
+int BCDConversion(int n) {
+    // 0 = 0000
+    // 1 = 0001
+    // 2 = 0010
+    // 3 = 0011
+    // 4 = 0100
+    // 5 = 0101
+    // 6 = 0110
+    // 7 = 0111
+    // 8 = 1000
+    // 9 = 1001
+    switch (n) {
+        case 0:
+            return 0;
+        case 1:
+            return 1;
+        case 2:
+            return 10;
+        case 3:
+            return 11;
+        case 4:
+            return 100;
+        case 5:
+            return 101;
+        case 6:
+            return 110;
+        case 7:
+            return 111;
+        case 8:
+            return 1000;
+        case 9:
+            return 1001;
+    }
+    return 0;
+}
+
+void set_number(int number, int pin) {
+    int bcd = BCDConversion(number);
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_7, bcd % 10);
+    bcd /= 10;
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, bcd % 10);
+    bcd /= 10;
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, bcd % 10);
+    bcd /= 10;
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_10, bcd % 10);
+    bcd /= 10;
+
+    switch (pin) {
+        case 4:
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, 1);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, 0);
+            break;
+        case 3:
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, 1);
+            break;
+        case 2:
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, 1);
+            break;
+        case 1:
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
+            break;
+    }
+}
+
+void show_number(int n, int pin) {
+    reset_port_7segment();
+    int num = (int) (n / pow(10, pin)) % 10;
+    set_number(num, pin + 1);
+}
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-
+extern ADC_HandleTypeDef hadc1;
+extern TIM_HandleTypeDef htim4;
 /* USER CODE BEGIN EV */
 extern const int player_index, stair_index, broke_stair_index, coil_index, status_start, status_menu,
         status_info, status_game;
@@ -235,6 +334,19 @@ void EXTI4_IRQHandler(void) {
 }
 
 /**
+  * @brief This function handles ADC1 and ADC2 interrupts.
+  */
+void ADC1_2_IRQHandler(void) {
+    /* USER CODE BEGIN ADC1_2_IRQn 0 */
+
+    /* USER CODE END ADC1_2_IRQn 0 */
+    HAL_ADC_IRQHandler(&hadc1);
+    /* USER CODE BEGIN ADC1_2_IRQn 1 */
+
+    /* USER CODE END ADC1_2_IRQn 1 */
+}
+
+/**
   * @brief This function handles EXTI line[9:5] interrupts.
   */
 void EXTI9_5_IRQHandler(void) {
@@ -246,6 +358,20 @@ void EXTI9_5_IRQHandler(void) {
     /* USER CODE BEGIN EXTI9_5_IRQn 1 */
 
     /* USER CODE END EXTI9_5_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM4 global interrupt.
+  */
+void TIM4_IRQHandler(void) {
+    /* USER CODE BEGIN TIM4_IRQn 0 */
+
+    /* USER CODE END TIM4_IRQn 0 */
+    HAL_TIM_IRQHandler(&htim4);
+    /* USER CODE BEGIN TIM4_IRQn 1 */
+    show_number(difficulty * 1000 + score, state_7segment);
+    state_7segment = (state_7segment + 1) % 4;
+    /* USER CODE END TIM4_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
