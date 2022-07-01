@@ -255,6 +255,7 @@ const int black_hole_char_indx = 3;
 const int alien_char_indx = 4;
 const int player_char_indx = 5;
 const int bullet_char_indx = 6;
+int map[20][4];
 
 void init_lcd() {
     char_map[plat] = 0;                //platform_char
@@ -286,7 +287,7 @@ void init_lcd() {
     srand(HAL_GetTick());
 
     // build map
-    int map[20][4];
+
     //map[][] = 20 --> blank
     for (int i = 0; i < 20; ++i) {
         int random_col = rand() % 4;
