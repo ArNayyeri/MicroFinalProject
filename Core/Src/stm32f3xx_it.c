@@ -25,6 +25,9 @@
 #include "LiquidCrystal.h"
 #include "stdio.h"
 #include "math.h"
+#include "stdlib.h"
+#include <stdbool.h>
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,6 +60,153 @@
 int state_7segment = 0;
 int score = 888;
 int difficulty = 4;
+typedef unsigned char byte;
+
+byte platform_char[] = {
+        0x00,
+        0x01,
+        0x01,
+        0x01,
+        0x01,
+        0x01,
+        0x01,
+        0x00
+};
+
+byte broken_plat_char[] = {
+        0x00,
+        0x01,
+        0x01,
+        0x00,
+        0x00,
+        0x01,
+        0x01,
+        0x00
+};
+
+byte spring_plat_char[] = {
+        0x00,
+        0x15,
+        0x0B,
+        0x01,
+        0x01,
+        0x01,
+        0x01,
+        0x00
+};
+
+byte black_hole_char[] = {
+        0x00,
+        0x0E,
+        0x11,
+        0x11,
+        0x11,
+        0x11,
+        0x0E,
+        0x00
+};
+
+
+byte alien_char[] = {
+        0x11,
+        0x0A,
+        0x06,
+        0x0E,
+        0x0E,
+        0x06,
+        0x0A,
+        0x11
+};
+
+byte player_char[] = {
+        0x00,
+        0x00,
+        0x00,
+        0x16,
+        0x16,
+        0x1E,
+        0x0C,
+        0x00
+};
+
+
+byte p_on_plat_char[] = {
+        0x00,
+        0x01,
+        0x01,
+        0x17,
+        0x17,
+        0x1F,
+        0x0D,
+        0x00
+};
+
+
+byte p_on_broken_plat_char[] = {
+        0x00,
+        0x01,
+        0x01,
+        0x16,
+        0x16,
+        0x1F,
+        0x0D,
+        0x00
+};
+
+byte p_on_spring_plat_char[] = {
+        0x00,
+        0x15,
+        0x0B,
+        0x01,
+        0x17,
+        0x17,
+        0x1F,
+        0x0C
+};
+
+byte bullet_char[] = {
+        0x00,
+        0x00,
+        0x00,
+        0x0C,
+        0x0C,
+        0x00,
+        0x00,
+        0x00
+};
+
+byte bullet_on_plat_char[] = {
+        0x00,
+        0x01,
+        0x01,
+        0x0D,
+        0x0D,
+        0x01,
+        0x01,
+        0x00
+};
+
+byte bullet_on_broken_plat_char[] = {
+        0x00,
+        0x01,
+        0x01,
+        0x0C,
+        0x0C,
+        0x01,
+        0x01,
+        0x00
+};
+
+byte bullet_on_spring_plat_char[] = {
+        0x00,
+        0x15,
+        0x0B,
+        0x0D,
+        0x0D,
+        0x01,
+        0x01,
+        0x00
+};
 
 void send_UART(char *string);
 
@@ -65,6 +215,107 @@ void show_menu();
 void PWM_Start();
 
 void PWM_Change_Tone(uint16_t pwm_freq, uint16_t volume);
+
+
+const int plat = 0;                            //platform_char
+const int broken_plat = 1;                    //broken_plat_char
+const int spring_plat = 2;                    //spring_plat_char
+const int black_hole = 3;                    //black_hole_char
+const int alien = 4;                        //alien_char
+const int player_blank = 5;                    //player_char
+const int p_on_plat = 6;                    //player_char -> p_on_plat_char
+const int p_on_broken_plat = 7;                //player_char -> p_on_broken_plat_char
+const int p_on_spring_plat = 8;                //player_char -> p_on_spring_plat_char
+const int p_on_alien = 9;                    //player_char ? ? ?
+const int p_on_black_hole = 10;                //player_char ? ? ?
+const int bullet_blank = 11;                //bullet_char
+const int bullet_on_plat = 12;                //bullet_char -> bullet_on_plat_char
+const int bullet_on_broken_plat = 13;        //bullet_char -> bullet_on_broken_plat_char
+const int bullet_on_spring_plat = 14;        //bullet_char -> bullet_on_spring_plat
+const int bullet_on_black_hole = 15;        //bullet_char -> ?
+const int bullet_on_alien = 16;                //bullet_char -> ?
+const int blank = 20;
+int char_map[20];
+
+bool isFalling = false;
+int curr_y = 19;
+int curr_x = 1;
+int jump = 7;
+
+int get_custom_char_index(int value) {
+    // update customChar if needed (if player on plat and...)
+    return char_map[value];
+
+}
+
+const int platform_char_indx = 0;
+const int broken_plat_char_indx = 1;
+const int spring_plat_char_indx = 2;
+const int black_hole_char_indx = 3;
+const int alien_char_indx = 4;
+const int player_char_indx = 5;
+const int bullet_char_indx = 6;
+
+void init_lcd() {
+    char_map[plat] = 0;                //platform_char
+    char_map[broken_plat] = 1;            //broken_plat_char
+    char_map[spring_plat] = 2;            //spring_plat_char
+    char_map[black_hole] = 3;            //black_hole_char
+    char_map[alien] = 4;                //alien_char
+    char_map[player_blank] = 5;            //player_char
+    char_map[p_on_plat] = 5;            //player_char -> p_on_plat_char
+    char_map[p_on_broken_plat] = 5;        //player_char -> p_on_broken_plat_char
+    char_map[p_on_spring_plat] = 5;        //player_char -> p_on_spring_plat_char
+    char_map[p_on_alien] = 5;            //player_char ? ? ?
+    char_map[p_on_black_hole] = 5;        //player_char ? ? ?
+    char_map[bullet_blank] = 6;        //bullet_char
+    char_map[bullet_on_plat] = 6;        //bullet_char -> bullet_on_plat_char
+    char_map[bullet_on_broken_plat] = 6;//bullet_char -> bullet_on_broken_plat_char
+    char_map[bullet_on_spring_plat] = 6;//bullet_char -> bullet_on_spring_plat
+    char_map[bullet_on_black_hole] = 6;    //bullet_char ? ? ?
+    char_map[bullet_on_alien] = 6;        //bullet_char ? ? ?
+
+    createChar(0, platform_char);
+    createChar(1, broken_plat_char);
+    createChar(2, spring_plat_char);
+    createChar(4, black_hole_char);
+    createChar(5, player_char);
+    createChar(6, bullet_char);
+
+
+    srand(HAL_GetTick());
+
+    // build map
+    int map[20][4];
+    //map[][] = 20 --> blank
+    for (int i = 0; i < 20; ++i) {
+        int random_col = rand() % 4;
+
+        for (int j = 0; j < 4; ++j) {
+            if (j != random_col) map[i][j] = blank;
+            else {
+                map[i][j] = plat;
+            }
+        }
+    }
+
+    //player on [1][2]
+    createChar(player_char_indx, p_on_plat_char);
+    map[19][1] = p_on_plat;
+
+    // init lcd:
+    for (int i = 19; i >= 0; i--) {
+        for (int j = 0; j < 4; ++j) {
+            setCursor(i, j);
+            if (map[i][j] == blank) {
+                print(" ");
+            } else {
+                write(get_custom_char_index(map[i][j]));
+            }
+        }
+    }
+}
+
 
 void reset_port_7segment() {
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, 0);
@@ -165,6 +416,7 @@ void show_number(int n, int pin) {
 /* External variables --------------------------------------------------------*/
 extern ADC_HandleTypeDef hadc4;
 extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
 extern UART_HandleTypeDef huart4;
 /* USER CODE BEGIN EV */
@@ -369,6 +621,31 @@ void TIM2_IRQHandler(void) {
 }
 
 /**
+  * @brief This function handles TIM3 global interrupt.
+  */
+void TIM3_IRQHandler(void) {
+    /* USER CODE BEGIN TIM3_IRQn 0 */
+
+    /* USER CODE END TIM3_IRQn 0 */
+    HAL_TIM_IRQHandler(&htim3);
+    /* USER CODE BEGIN TIM3_IRQn 1 */
+    if (isFalling) {
+
+    } else {
+        // not isFalling
+        if (jump > 0) {
+            curr_y++;
+            jump--;
+
+            if (map[curr_y][curr_x] == blank) {
+
+            }
+        }
+    }
+    /* USER CODE END TIM3_IRQn 1 */
+}
+
+/**
   * @brief This function handles TIM4 global interrupt.
   */
 void TIM4_IRQHandler(void) {
@@ -480,9 +757,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     const uint8_t button_number = row_number * 4 + column_number + 1;
     switch (button_number) {
         case 1:
-            if (status == status_menu) {
-                status = status_game;
-            }
             break;
         case 2:
             /* code */
@@ -494,8 +768,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
             if (status == status_menu) {
                 status = status_game;
                 //init game
+                init_lcd();
+
             } else if (status == status_info) {
                 show_menu();
+            } else if (status == status_game) {
+                //right shift
             }
             break;
         case 5:
@@ -523,6 +801,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
                 setCursor(0, 3);
                 print(time_date);
 
+            } else if (status == status_game) {
+                //left shift
             }
             break;
         case 9:
