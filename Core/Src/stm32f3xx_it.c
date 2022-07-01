@@ -55,10 +55,16 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 int state_7segment = 0;
-int score = 123;
+int score = 888;
 int difficulty = 4;
 
+void send_UART(char *string);
+
 void show_menu();
+
+void PWM_Start();
+
+void PWM_Change_Tone(uint16_t pwm_freq, uint16_t volume);
 
 void reset_port_7segment() {
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, 0);
@@ -157,11 +163,13 @@ void show_number(int n, int pin) {
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-extern ADC_HandleTypeDef hadc1;
+extern ADC_HandleTypeDef hadc4;
+extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim4;
+extern UART_HandleTypeDef huart4;
 /* USER CODE BEGIN EV */
 extern const int player_index, stair_index, broke_stair_index, coil_index, status_start, status_menu,
-        status_info, status_game;
+        status_info, status_game, status_end;
 extern int status;
 extern RTC_TimeTypeDef rTime;
 extern RTC_DateTypeDef rDate;
@@ -334,19 +342,6 @@ void EXTI4_IRQHandler(void) {
 }
 
 /**
-  * @brief This function handles ADC1 and ADC2 interrupts.
-  */
-void ADC1_2_IRQHandler(void) {
-    /* USER CODE BEGIN ADC1_2_IRQn 0 */
-
-    /* USER CODE END ADC1_2_IRQn 0 */
-    HAL_ADC_IRQHandler(&hadc1);
-    /* USER CODE BEGIN ADC1_2_IRQn 1 */
-
-    /* USER CODE END ADC1_2_IRQn 1 */
-}
-
-/**
   * @brief This function handles EXTI line[9:5] interrupts.
   */
 void EXTI9_5_IRQHandler(void) {
@@ -361,6 +356,19 @@ void EXTI9_5_IRQHandler(void) {
 }
 
 /**
+  * @brief This function handles TIM2 global interrupt.
+  */
+void TIM2_IRQHandler(void) {
+    /* USER CODE BEGIN TIM2_IRQn 0 */
+
+    /* USER CODE END TIM2_IRQn 0 */
+    HAL_TIM_IRQHandler(&htim2);
+    /* USER CODE BEGIN TIM2_IRQn 1 */
+
+    /* USER CODE END TIM2_IRQn 1 */
+}
+
+/**
   * @brief This function handles TIM4 global interrupt.
   */
 void TIM4_IRQHandler(void) {
@@ -371,7 +379,36 @@ void TIM4_IRQHandler(void) {
     /* USER CODE BEGIN TIM4_IRQn 1 */
     show_number(difficulty * 1000 + score, state_7segment);
     state_7segment = (state_7segment + 1) % 4;
+    HAL_ADC_Start_IT(&hadc4);
     /* USER CODE END TIM4_IRQn 1 */
+}
+
+/**
+  * @brief This function handles UART4 global interrupt / UART4 wake-up interrupt through EXTI line 34.
+  */
+void UART4_IRQHandler(void) {
+    /* USER CODE BEGIN UART4_IRQn 0 */
+
+    /* USER CODE END UART4_IRQn 0 */
+    HAL_UART_IRQHandler(&huart4);
+    /* USER CODE BEGIN UART4_IRQn 1 */
+
+    /* USER CODE END UART4_IRQn 1 */
+}
+
+/**
+  * @brief This function handles ADC4 interrupt.
+  */
+void ADC4_IRQHandler(void) {
+    /* USER CODE BEGIN ADC4_IRQn 0 */
+
+    /* USER CODE END ADC4_IRQn 0 */
+    HAL_ADC_IRQHandler(&hadc4);
+    /* USER CODE BEGIN ADC4_IRQn 1 */
+    int x = HAL_ADC_GetValue(&hadc4);
+    x = x * 10 / 4095;
+    difficulty = x;
+    /* USER CODE END ADC4_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
@@ -443,7 +480,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     const uint8_t button_number = row_number * 4 + column_number + 1;
     switch (button_number) {
         case 1:
-            /* code */
+            if (status == status_menu) {
+                status = status_game;
+            }
             break;
         case 2:
             /* code */
@@ -510,11 +549,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
         case 16:
             /* code */
             break;
-
         default:
             break;
     }
 }
+
 
 void show_menu() {
     status = status_menu;
@@ -523,5 +562,41 @@ void show_menu() {
     print("Start Game");
     setCursor(8, 2);
     print("About");
+}
+
+TIM_HandleTypeDef *pwm_timer = &htim2; // Point to PWM timer configured in CubeMX
+uint32_t pwm_channel = TIM_CHANNEL_2;  // Specify configured PWM channel
+
+void PWM_Start() {
+    HAL_TIM_PWM_Start(pwm_timer, pwm_channel);
+}
+
+void PWM_Change_Tone(uint16_t pwm_freq, uint16_t volume) // pwm_freq (1 - 20000), volume (0 - 1000)
+{
+    if (pwm_freq == 0 || pwm_freq > 20000) {
+        __HAL_TIM_SET_COMPARE(pwm_timer, pwm_channel, 0);
+    } else {
+        const uint32_t internal_clock_freq = HAL_RCC_GetSysClockFreq();
+        // const uint16_t prescaler = 1;
+        const uint16_t prescaler = 1 + internal_clock_freq / pwm_freq / 60000;
+        const uint32_t timer_clock = internal_clock_freq / prescaler;
+        const uint32_t period_cycles = timer_clock / pwm_freq;
+        const uint32_t pulse_width = volume * period_cycles / 1000 / 2;
+
+        pwm_timer->Instance->PSC = prescaler - 1;
+        pwm_timer->Instance->ARR = period_cycles - 1;
+        pwm_timer->Instance->EGR = TIM_EGR_UG;
+        __HAL_TIM_SET_COMPARE(pwm_timer, pwm_channel, pulse_width); // pwm_timer->Instance->CCR2 = pulse_width;
+    }
+}
+
+void send_UART(char *string) {
+    HAL_RTC_GetTime(&hrtc, &rTime, RTC_FORMAT_BIN);
+    HAL_RTC_GetDate(&hrtc, &rDate, RTC_FORMAT_BIN);
+    char s[1000] = "";
+    int size = sprintf(s, "%s 20%d-%d-%d  %d:%d:%d\n", string, rDate.Year, rDate.Month, rDate.Date, rTime.Hours,
+                       rTime.Minutes, rTime.Seconds);
+    HAL_UART_Transmit(&huart4, s, size, 100);
+
 }
 /* USER CODE END 1 */
