@@ -26,7 +26,8 @@
 #include "stdio.h"
 #include "math.h"
 #include "stdlib.h"
-#include <stdbool.h>
+#include "stdbool.h"
+#include "string.h"
 
 /* USER CODE END Includes */
 
@@ -58,9 +59,15 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 int state_7segment = 0;
-int score = 888;
-int difficulty = 4;
+int score = 0;
+int difficulty = 0;
+unsigned char data;
+unsigned char buffer[100] = "";
+int position = 0;
+unsigned char name[100] = "Doodler";
+
 typedef unsigned char byte;
+
 
 byte platform_char[] = {
         0x00,
@@ -208,6 +215,18 @@ byte bullet_on_spring_plat_char[] = {
         0x00
 };
 
+byte death_char[] = {
+        0x00,
+        0x11,
+        0x0A,
+        0x04,
+        0x0A,
+        0x11,
+        0x00,
+        0x00
+};
+
+
 void send_UART(char *string);
 
 void show_menu();
@@ -215,6 +234,10 @@ void show_menu();
 void PWM_Start();
 
 void PWM_Change_Tone(uint16_t pwm_freq, uint16_t volume);
+
+void end_game();
+
+void setup_melody(int melody[], int size_arr);
 
 
 const int plat = 0;                            //platform_char
@@ -255,68 +278,29 @@ const int black_hole_char_indx = 3;
 const int alien_char_indx = 4;
 const int player_char_indx = 5;
 const int bullet_char_indx = 6;
+const int death_char_indx = 7;
+
 int map[20][4];
+int old_map[20][4];
+const int map_m = 20;
+const int map_n = 4;
+const int half_board = 10;
 
-void init_lcd() {
-    char_map[plat] = 0;                //platform_char
-    char_map[broken_plat] = 1;            //broken_plat_char
-    char_map[spring_plat] = 2;            //spring_plat_char
-    char_map[black_hole] = 3;            //black_hole_char
-    char_map[alien] = 4;                //alien_char
-    char_map[player_blank] = 5;            //player_char
-    char_map[p_on_plat] = 5;            //player_char -> p_on_plat_char
-    char_map[p_on_broken_plat] = 5;        //player_char -> p_on_broken_plat_char
-    char_map[p_on_spring_plat] = 5;        //player_char -> p_on_spring_plat_char
-    char_map[p_on_alien] = 5;            //player_char ? ? ?
-    char_map[p_on_black_hole] = 5;        //player_char ? ? ?
-    char_map[bullet_blank] = 6;        //bullet_char
-    char_map[bullet_on_plat] = 6;        //bullet_char -> bullet_on_plat_char
-    char_map[bullet_on_broken_plat] = 6;//bullet_char -> bullet_on_broken_plat_char
-    char_map[bullet_on_spring_plat] = 6;//bullet_char -> bullet_on_spring_plat
-    char_map[bullet_on_black_hole] = 6;    //bullet_char ? ? ?
-    char_map[bullet_on_alien] = 6;        //bullet_char ? ? ?
-
-    createChar(0, platform_char);
-    createChar(1, broken_plat_char);
-    createChar(2, spring_plat_char);
-    createChar(4, black_hole_char);
-    createChar(5, player_char);
-    createChar(6, bullet_char);
-
-
-    srand(HAL_GetTick());
-
-    // build map
-
-    //map[][] = 20 --> blank
-    for (int i = 0; i < 20; ++i) {
-        int random_col = rand() % 4;
-
-        for (int j = 0; j < 4; ++j) {
-            if (j != random_col) map[i][j] = blank;
-            else {
-                map[i][j] = plat;
-            }
-        }
-    }
-
-    //player on [1][2]
-    createChar(player_char_indx, p_on_plat_char);
-    map[19][1] = p_on_plat;
-
-    // init lcd:
-    for (int i = 19; i >= 0; i--) {
-        for (int j = 0; j < 4; ++j) {
-            setCursor(i, j);
-            if (map[i][j] == blank) {
-                print(" ");
-            } else {
-                write(get_custom_char_index(map[i][j]));
-            }
+void copy_map(int old_map[map_m][map_n], int map[map_m][map_n]) {
+    for (int i = 0; i < map_m; i++) {
+        for (int j = 0; j < map_n; j++) {
+            old_map[i][j] = map[i][j];
         }
     }
 }
 
+void init_lcd();
+
+int update_map_not_falling(int map[map_m][map_n], int curr_y, int curr_x, int old_y, int old_x);
+
+void update_map_falling(int map[map_m][map_n], int curr_y, int curr_x, int old_y, int old_x);
+
+void update_lcd();
 
 void reset_port_7segment() {
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, 0);
@@ -412,6 +396,21 @@ void show_number(int n, int pin) {
     int num = (int) (n / pow(10, pin)) % 10;
     set_number(num, pin + 1);
 }
+
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (data == '\n') {
+        strcpy(name, buffer);
+        strcpy(buffer, "");
+        position = 0;
+    } else {
+        buffer[position] = data;
+        buffer[position + 1] = '\0';
+        position = position + 1;
+    }
+}
+
+
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -419,6 +418,7 @@ extern ADC_HandleTypeDef hadc4;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
+extern TIM_HandleTypeDef htim6;
 extern UART_HandleTypeDef huart4;
 /* USER CODE BEGIN EV */
 extern const int player_index, stair_index, broke_stair_index, coil_index, status_start, status_menu,
@@ -427,6 +427,7 @@ extern int status;
 extern RTC_TimeTypeDef rTime;
 extern RTC_DateTypeDef rDate;
 extern RTC_HandleTypeDef hrtc;
+extern int starwars_sound[176];
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -630,19 +631,28 @@ void TIM3_IRQHandler(void) {
     /* USER CODE END TIM3_IRQn 0 */
     HAL_TIM_IRQHandler(&htim3);
     /* USER CODE BEGIN TIM3_IRQn 1 */
-    if (isFalling) {
+    //copy_map(old_map, map);
+    int old_y = curr_y;
+    int old_x = curr_x;
+    if (!isFalling) {
+        if (jump > 0) {
+            curr_y--;
+            jump--;
+            if (jump <= 0) isFalling = true;
+
+            curr_y = update_map_not_falling(map, curr_y, curr_x, old_y, old_x);
+        }
 
     } else {
-        // not isFalling
-        if (jump > 0) {
-            curr_y++;
-            jump--;
-
-            if (map[curr_y][curr_x] == blank) {
-
-            }
-        }
+        curr_y++;
+        update_map_falling(map, curr_y, curr_x, old_y, old_x);
     }
+
+    ///****** update lcd
+    update_lcd();
+    score++;
+
+    //copy_map(old_map, map);
     /* USER CODE END TIM3_IRQn 1 */
 }
 
@@ -670,8 +680,42 @@ void UART4_IRQHandler(void) {
     /* USER CODE END UART4_IRQn 0 */
     HAL_UART_IRQHandler(&huart4);
     /* USER CODE BEGIN UART4_IRQn 1 */
+    HAL_UART_Receive_IT(&huart4, &data, sizeof(unsigned char));
 
     /* USER CODE END UART4_IRQn 1 */
+}
+
+/**
+  * @brief This function handles Timer 6 interrupt and DAC underrun interrupts.
+  */
+void TIM6_DAC_IRQHandler(void) {
+    /* USER CODE BEGIN TIM6_DAC_IRQn 0 */
+
+    /* USER CODE END TIM6_DAC_IRQn 0 */
+    HAL_TIM_IRQHandler(&htim6);
+    /* USER CODE BEGIN TIM6_DAC_IRQn 1 */
+    if (difficulty == -1) {
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_10, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_12, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_13, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_14, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, GPIO_PIN_SET);
+        difficulty = -2;
+    } else {
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_10, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_12, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_13, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_14, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, GPIO_PIN_RESET);
+        difficulty = -1;
+    }
+    /* USER CODE END TIM6_DAC_IRQn 1 */
 }
 
 /**
@@ -691,6 +735,171 @@ void ADC4_IRQHandler(void) {
 
 /* USER CODE BEGIN 1 */
 
+int get_upper_map_value(int map[map_m][map_n], int curr_y, int curr_x, int old_y, int old_x) {
+    int result = -1;
+    if (map[old_y][old_x] == player_blank) result = blank;
+    if (map[old_y][old_x] == p_on_plat) result = plat;
+    if (map[old_y][old_x] == p_on_broken_plat) {
+        //result = blank;
+        result = broken_plat;
+    }
+    if (map[old_y][old_x] == p_on_spring_plat) result = spring_plat;
+    if (map[old_y][old_x] == p_on_alien) result = alien;
+    if (map[old_y][old_x] == p_on_black_hole) result = black_hole;
+
+    return result;
+}
+
+void update_map_falling(int map[map_m][map_n], int curr_y, int curr_x, int old_y, int old_x) {
+    copy_map(old_map, map);
+    // isFalling
+    if (curr_y > map_m) {
+        // lost, fell into ground...
+    }
+    if (map[curr_y][curr_x] == blank) {
+        map[curr_y][curr_x] = player_blank;
+
+        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
+    } else if (map[curr_y][curr_x] == broken_plat) {
+        map[curr_y][curr_x] = p_on_broken_plat;
+
+        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
+    } else if (map[curr_y][curr_x] == black_hole) {
+        map[curr_y][curr_x] = p_on_black_hole;
+        // LOSE
+
+        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
+    } else if (map[curr_y][curr_x] == alien) {
+        map[curr_y][curr_x] = p_on_alien;
+        // LOSE
+
+        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
+    } else if (map[curr_y][curr_x] == plat) {
+        map[curr_y][curr_x] = p_on_plat;
+
+        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
+
+        isFalling = false;
+        jump = 7;
+
+
+    } else if (map[curr_y][curr_x] == spring_plat) {
+        map[curr_y][curr_x] = p_on_spring_plat;
+
+        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
+
+        isFalling = true;
+        jump = 20;
+
+    } else {
+        //should not happen
+    }
+
+}
+
+int update_map_not_falling(int map[map_m][map_n], int curr_y, int curr_x, int old_y, int old_x) {
+    copy_map(old_map, map);
+    if (map[curr_y][curr_x] == blank) {
+        map[curr_y][curr_x] = player_blank;
+
+        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
+    } else if (map[curr_y][curr_x] == broken_plat) {
+        map[curr_y][curr_x] = p_on_broken_plat;
+
+        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
+    } else if (map[curr_y][curr_x] == black_hole) {
+        map[curr_y][curr_x] = p_on_black_hole;
+        // LOSE
+
+        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
+    } else if (map[curr_y][curr_x] == alien) {
+        map[curr_y][curr_x] = p_on_alien;
+        // LOSE
+
+        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
+    } else if (map[curr_y][curr_x] == plat) {
+        map[curr_y][curr_x] = p_on_plat;
+
+        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
+    } else if (map[curr_y][curr_x] == spring_plat) {
+        map[curr_y][curr_x] = p_on_spring_plat;
+
+        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
+    } else {
+        //should not happen
+    }
+
+
+    if (curr_y <= half_board) {
+        //shift map[rows[1->19]] one unit down
+        for (int i = 19; i >= 1; i--) {
+            for (int j = 0; j < 4; j++) {
+                map[i][j] = map[i - 1][j];
+            }
+        }
+
+
+        //build new row
+        // build a specific function based on difficulty
+        int new_row[4] = {0, 0, 0, 0};
+
+
+        //map[row[0]] = new_row
+        for (int j = 0; j < 4; j++) {
+            map[0][j] = new_row[j];
+        }
+
+        return (curr_y + 1);
+
+        //curr_y++
+    } else {
+        // no shift in the map...
+
+        return curr_y;
+    }
+}
+
+void update_custom_chars(int map_value) {
+    if (map_value == player_blank) createChar(platform_char_indx, player_char);
+    if (map_value == p_on_plat) createChar(platform_char_indx, p_on_plat_char);
+    if (map_value == p_on_broken_plat) createChar(platform_char_indx, p_on_broken_plat_char);
+    if (map_value == p_on_spring_plat) createChar(platform_char_indx, p_on_spring_plat_char);
+
+
+    if (map_value == bullet_blank) createChar(bullet_char_indx, bullet_char);
+    if (map_value == bullet_on_plat) createChar(bullet_char_indx, bullet_on_plat_char);
+    if (map_value == bullet_on_broken_plat) createChar(bullet_char_indx, bullet_on_broken_plat_char);
+    if (map_value == bullet_on_spring_plat) createChar(bullet_char_indx, bullet_on_spring_plat_char);
+
+    // ? ?
+    if (map_value == bullet_on_black_hole) createChar(bullet_char_indx, black_hole_char);
+
+    // death ? ? ? ? ? ? ??
+    if (map_value == bullet_on_alien) createChar(bullet_char_indx, death_char);
+
+
+}
+
+void write_map_on_lcd(int map_value, int y, int x) {
+    setCursor(y, x);
+    if (map_value == blank) print(" ");
+    else {
+        write(get_custom_char_index(map_value));
+    }
+}
+
+void update_lcd() {
+    for (int i = 0; i < map_m; i++) {
+        for (int j = 0; j < map_n; j++) {
+            if (old_map[i][j] != map[i][j]) {
+                write_map_on_lcd(map[i][j], i, j);
+            } else {
+                // no update for block [i][j]
+            }
+        }
+    }
+    copy_map(old_map, map);
+}
 
 // Input pull down rising edge trigger interrupt pins:
 // Row1 PD3, Row2 PD5, Row3 PD7, Row4 PB4
@@ -768,6 +977,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
         case 4:
             if (status == status_menu) {
                 status = status_game;
+                HAL_TIM_Base_Start_IT(&htim4);
                 //init game
                 init_lcd();
 
@@ -775,6 +985,23 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
                 show_menu();
             } else if (status == status_game) {
                 //right shift
+                int old_y = curr_y;
+                int old_x = curr_x;
+
+                curr_x--;
+                if (curr_x < 0) curr_x = map_n - 1;
+
+                if (isFalling) {
+                    update_map_falling(map, curr_y, curr_x, old_y, old_x);
+                } else {
+                    // not falling
+                    update_map_not_falling(map, curr_y, curr_x, old_y, old_x);
+                }
+
+                update_lcd();
+
+            } else if (status == status_end) {
+                HAL_NVIC_SystemReset();
             }
             break;
         case 5:
@@ -804,6 +1031,21 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
             } else if (status == status_game) {
                 //left shift
+
+                int old_y = curr_y;
+                int old_x = curr_x;
+
+                curr_x++;
+                if (curr_x >= map_n) curr_x = 0;
+
+                if (isFalling) {
+                    update_map_falling(map, curr_y, curr_x, old_y, old_x);
+                } else {
+                    // not falling
+                    update_map_not_falling(map, curr_y, curr_x, old_y, old_x);
+                }
+
+                update_lcd();
             }
             break;
         case 9:
@@ -839,10 +1081,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 void show_menu() {
     status = status_menu;
     begin(20, 4);
-    setCursor(5, 1);
+    setCursor(5, 0);
     print("Start Game");
-    setCursor(8, 2);
+    setCursor(8, 1);
     print("About");
+    setCursor(0, 3);
+    char string[100];
+    sprintf(string, "name : %s", name);
+    print(string);
 }
 
 TIM_HandleTypeDef *pwm_timer = &htim2; // Point to PWM timer configured in CubeMX
@@ -877,7 +1123,112 @@ void send_UART(char *string) {
     char s[1000] = "";
     int size = sprintf(s, "%s 20%d-%d-%d  %d:%d:%d\n", string, rDate.Year, rDate.Month, rDate.Date, rTime.Hours,
                        rTime.Minutes, rTime.Seconds);
-    HAL_UART_Transmit(&huart4, s, size, 100);
+    HAL_UART_Transmit_IT(&huart4, s, size);
+
+}
+
+void end_game() {
+    clear();
+    setCursor(3, 0);
+    print(name);
+    char string[100] = "";
+    sprintf(string, "Score: %d", score);
+    setCursor(3, 1);
+    print(string);
+    difficulty = -1;
+    HAL_TIM_Base_Start_IT(&htim6);
+    setup_melody(starwars_sound, sizeof(starwars_sound));
+}
+
+void setup_melody(int melody[], int size_arr) {
+    int tempo = 108;
+    int notes = size_arr / sizeof(melody[0]) / 2;
+    int wholenote = (60000 * 4) / tempo;
+    int divider = 0, noteDuration = 0;
+
+    PWM_Start();
+    for (int thisNote = 0;
+         thisNote < notes * 2 && (status == status_start || status == status_end); thisNote = thisNote + 2) {
+        divider = melody[thisNote + 1];
+        if (divider > 0) {
+            noteDuration = (wholenote) / divider;
+        } else if (divider < 0) {
+            noteDuration = (wholenote) / abs(divider);
+            noteDuration *= 1.5;
+        }
+
+        PWM_Change_Tone(melody[thisNote], 100);
+
+        HAL_Delay(noteDuration);
+
+        PWM_Change_Tone(melody[thisNote], 0);
+    }
+}
+
+void init_lcd() {
+    char_map[plat] = 0;                //platform_char
+    char_map[broken_plat] = 1;            //broken_plat_char
+    char_map[spring_plat] = 2;            //spring_plat_char
+    char_map[black_hole] = 3;            //black_hole_char
+    char_map[alien] = 4;                //alien_char
+    char_map[player_blank] = 5;            //player_char
+    char_map[p_on_plat] = 5;            //player_char -> p_on_plat_char
+    char_map[p_on_broken_plat] = 5;        //player_char -> p_on_broken_plat_char
+    char_map[p_on_spring_plat] = 5;        //player_char -> p_on_spring_plat_char
+    char_map[p_on_alien] = 7;            //death_char
+    char_map[p_on_black_hole] = 7;        //death_char
+    char_map[bullet_blank] = 6;        //bullet_char
+    char_map[bullet_on_plat] = 6;        //bullet_char -> bullet_on_plat_char
+    char_map[bullet_on_broken_plat] = 6;//bullet_char -> bullet_on_broken_plat_char
+    char_map[bullet_on_spring_plat] = 6;//bullet_char -> bullet_on_spring_plat
+    char_map[bullet_on_black_hole] = 6;    //bullet_char ? ? ?
+    char_map[bullet_on_alien] = 6;        //bullet_char ? ? ?
+
+    createChar(0, platform_char);
+    createChar(1, broken_plat_char);
+    createChar(2, spring_plat_char);
+    createChar(4, black_hole_char);
+    createChar(5, player_char);
+    createChar(6, bullet_char);
+    createChar(7, death_char);
+
+
+    srand(HAL_GetTick());
+
+    // build initial map
+
+    //map[][] = 20 --> blank
+    for (int i = 0; i < 20; ++i) {
+        int random_col = rand() % 4;
+
+        for (int j = 0; j < 4; ++j) {
+            if (j != random_col) map[i][j] = blank;
+            else {
+                map[i][j] = plat;
+                //map[i][j] = blank;
+            }
+        }
+    }
+
+    //player on [1][2]
+    //createChar(player_char_indx, p_on_plat_char);
+    map[19][1] = p_on_plat;
+    copy_map(old_map, map);
+
+    // init lcd:
+    for (int i = 19; i >= 0; i--) {
+        for (int j = 0; j < 4; ++j) {
+            setCursor(i, j);
+            if (map[i][j] == blank) {
+                print(" ");
+            } else {
+                write(get_custom_char_index(map[i][j]));
+            }
+        }
+    }
+
+    // start the timer
+    HAL_TIM_Base_Start_IT(&htim3);
 
 }
 /* USER CODE END 1 */
