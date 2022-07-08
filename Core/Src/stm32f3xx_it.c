@@ -67,6 +67,7 @@ int position = 0;
 unsigned char name[100] = "Doodler";
 unsigned char current_char[2] = "1\0";
 int char_pos = 0;
+int frq_counter = 0;
 typedef unsigned char byte;
 
 
@@ -157,7 +158,7 @@ void end_game();
 
 void setup_melody(int melody[], int size_arr);
 
-void fill_new_row(int new_row[]);
+void fill_new_row();
 
 // map[][] values:
 const int blank = 0;
@@ -528,84 +529,82 @@ void TIM3_IRQHandler(void) {
     HAL_TIM_IRQHandler(&htim3);
     /* USER CODE BEGIN TIM3_IRQn 1 */
 
-    if (right_flag == true) {
-        right_flag = false;
-        int new_x = curr_x;
-        new_x--;
-        if (new_x < 0) new_x = 3;
-        curr_x = new_x;
-    } else if (left_flag == true) {
-        left_flag = false;
-        int new_x = curr_x;
-        new_x++;
-        if (new_x > 3) new_x = 0;
-        curr_x = new_x;
-    }
-
-    if (wasFalling) {
-        if (map[curr_y + 1][curr_x] == plat) {
-            wasFalling = false;
-            curr_y--;
-            jump = 7;
-        } else if (map[curr_y + 1][curr_x] == spring_plat) {
-            wasFalling = false;
-            curr_y--;
-            jump = 7;
-        } else if (map[curr_y + 1][curr_x] == broke_plat) {
-            map[curr_y + 1][curr_x] = blank;
-            curr_y++;
-        } else if (map[curr_y + 1][curr_x] == blank) {
-            curr_y++;
-        } else {
-            // add if map[x][y-1] == alien | black hole
-
-            // check ? ?
+    if (!frq_counter) {
+        if (right_flag == true) {
+            right_flag = false;
+            int new_x = curr_x;
+            new_x--;
+            if (new_x < 0) new_x = 3;
+            curr_x = new_x;
+        } else if (left_flag == true) {
+            left_flag = false;
+            int new_x = curr_x;
+            new_x++;
+            if (new_x > 3) new_x = 0;
+            curr_x = new_x;
         }
-    } else {
-        // wasJumping
-        jump--;
-        if (jump > 0) {
-            // still jumping
-            curr_y--;
-            if (curr_y <= half_board) {
-                //shift map[rows[1->19]] one unit down
-                for (int i = 19; i >= 1; i--) {
-                    for (int j = 0; j < 4; j++) {
-                        map[i][j] = map[i - 1][j];
-                    }
-                }
 
-
-                //build new row
-                // build a specific function based on difficulty
-                int new_row[4];
-                fill_new_row(new_row);
-
-                //map[row[0]] = new_row
-                for (int j = 0; j < 4; j++) {
-                    map[0][j] = new_row[j];
-                }
-
+        if (wasFalling) {
+            if (map[curr_y + 1][curr_x] == plat) {
+                wasFalling = false;
+                curr_y--;
+                jump = 7;
+            } else if (map[curr_y + 1][curr_x] == spring_plat) {
+                wasFalling = false;
+                curr_y--;
+                jump = 7;
+            } else if (map[curr_y + 1][curr_x] == broke_plat) {
+                map[curr_y + 1][curr_x] = blank;
+                curr_y++;
+            } else if (map[curr_y + 1][curr_x] == blank) {
                 curr_y++;
             } else {
-                // nothing ? ? ?
+                // add if map[x][y-1] == alien | black hole
 
+                // check ? ?
             }
         } else {
-            //end of jump
-            wasFalling = true;
-            jump = 0;
-            // anythin else ? ? ?
-            // curr_y++ ? --
+            // wasJumping
+            jump--;
+            if (jump > 0) {
+                // still jumping
+                curr_y--;
+                if (curr_y <= half_board) {
+
+                    curr_y++;
+                    //shift map[rows[1->19]] one unit down
+                    for (int i = 19; i >= 1; i--) {
+                        for (int j = 0; j < 4; j++) {
+                            map[i][j] = map[i - 1][j];
+                        }
+                    }
+
+
+                    // build new row
+                    // build a specific function based on difficulty
+                    //int new_row[4];
+                    fill_new_row();
+
+                } else {
+                    // nothing ? ? ?
+
+                }
+            } else {
+                //end of jump
+                wasFalling = true;
+                jump = 0;
+                // anythin else ? ? ?
+                // curr_y++ ? --
+            }
         }
+
+        // update LCD
+        update_lcd();
+        copy_map(old_map, map);
+        score++;
+        //copy_map(old_map, map);
     }
-
-
-    // update LCD
-    update_lcd();
-    copy_map(old_map, map);
-    score++;
-    //copy_map(old_map, map);
+    frq_counter = (frq_counter + 1) % 3;
     /* USER CODE END TIM3_IRQn 1 */
 }
 
@@ -688,13 +687,157 @@ void ADC4_IRQHandler(void) {
 
 /* USER CODE BEGIN 1 */
 
-void fill_new_row(int new_row[]) {
-    // fill new_row[0:4] based on difficulty
-    new_row[0] = 1;
-    new_row[1] = 1;
-    new_row[2] = 1;
-    new_row[3] = 1;
+int get_max(int a, int b) {
+    if(a > b) return a;
+    else return b;
 }
+int get_min(int a, int b) {
+    if(a > b) return b;
+    else return a;
+}
+int get_heighest_reachable_height(int new_map[20][4]) {
+    // new_map vs lcd :
+    // new_map[0, :]  = top most row of lcd
+    // new_map[1, :]  = second to top most row of lcd
+    // ...
+    // new_map[19, :] = bottom most row of lcd
+
+    // find last reachable platfrom
+    // return last_reahcbel_platform.y + 7/20
+
+    int last_reach = curr_y - jump;
+
+    int result = 100000;
+    for(int i = curr_y; i >= 0; i--) {
+
+        int max_boost_in_row = -1;
+        for(int j = 0; j < 4; j++) {
+            if(new_map[i][j] == plat) {
+                if(last_reach <=  i-1) {
+                    result = get_min(result, i-7);
+                    max_boost_in_row = get_max(max_boost_in_row, 7);
+                }
+            }
+            else if(new_map[i][j] == spring_plat) {
+                if(last_reach <= i-1) {
+                    result = get_min(result, i-20);
+                    max_boost_in_row = get_max(max_boost_in_row, 20);
+                }
+            }
+        }
+
+        last_reach -= last_reach;
+    }
+
+    /*int result = +1000;
+    // iteration starts from curr_y
+    int temp_jump = jump;
+    for (int i = curr_y+1; i >= 0; i--) {
+
+        for (int j = 0; j < 4; j++) {
+
+            if (new_map[i][j] == plat) {
+
+                bool is_reachable_height_wise = true;
+                if (curr_y - temp_jump >= i - 1) is_reachable_height_wise = false;
+                else is_reachable_height_wise = true;
+
+                if (is_reachable_height_wise) {
+                    if (result > i - 7) {
+                        result = i - 7;
+                    }
+                }
+            }
+            else if (new_map[i][j] == spring_plat) {
+
+                bool is_reachable_height_wise = true;
+                if (curr_y - jump >= i - 1) is_reachable_height_wise = false;
+                else is_reachable_height_wise = true;
+
+                if (is_reachable_height_wise) {
+                    if (result > i - 20) {
+                        result = i - 20;
+                    }
+                }
+            }
+        }
+    }
+    */
+    return result;
+}
+
+bool check_possible(int new_map[20][4]) {
+    bool result = false;
+    int highest_reachable_height = get_heighest_reachable_height(new_map);
+
+    if (highest_reachable_height <= -1) {
+        result = true;
+    }
+
+    return result;
+}
+
+int get_block(int rand_chance) {
+
+    // ignore difficulty for now...
+    int blank_chance = 45;
+    int plat_chance = 85;
+    int broke_plat_chance = 95;
+    int spring_plat_chance = 100;
+
+    if (rand_chance <= blank_chance) {
+        return blank;
+    } else if (rand_chance <= plat_chance) {
+        return plat;
+    } else if (rand_chance <= broke_plat_chance) {
+        return broke_plat;
+    } else if (rand_chance <= spring_plat_chance) {
+        return spring_plat;
+    }
+    return -1;
+    // return blank, plat, broke_plat, spring_plat, black_hole or alien const int based on rand_chance
+}
+
+void fill_new_row() {
+    // fill new_row[0:4] based on difficulty
+    // fil map[0, :]
+    int new_map[20][4];
+
+    // copy map to new map
+    for (int i = 0; i < 20; i++) {
+        for (int j = 0; j < 4; j++) {
+            new_map[i][j] = map[i][j];
+        }
+    }
+
+    // fill new_map[0, :] with new values
+    // based on difficulty
+    int blank_chance;
+    int plat_chance;
+    int broke_plat_chance;
+    int spring_plat_chance;
+
+    do {
+        int rand_chance = rand() % 100;
+        int new_block = get_block(rand_chance);
+
+        int rand_col = rand() % 4;
+
+        for (int i = 0; i < 4; i++) {
+            if (i != rand_col) new_map[0][i] = blank;
+            else new_map[0][i] = new_block;
+        }
+    } while (check_possible(new_map));
+
+    // copy new_map[0, :] to map
+    for (int i = 0; i < 20; i++) {
+        for (int j = 0; j < 4; j++) {
+            map[i][j] = new_map[i][j];
+        }
+    }
+
+}
+
 
 int get_custom_char_index(int value) {
     if (value == plat) return 0;

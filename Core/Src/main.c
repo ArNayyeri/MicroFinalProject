@@ -285,7 +285,7 @@ int super_mario_sound[] = {
 
 //define consts
 const int player_index = 0, stair_index = 1, broke_stair_index = 2, coil_index = 3, status_start = 0, status_menu = 1,
-        status_game = 2, status_info = 3, status_end = 4,status_select_name=5;
+        status_game = 2, status_info = 3, status_end = 4, status_select_name = 5;
 int status = 0;
 RTC_TimeTypeDef rTime;
 RTC_DateTypeDef rDate;
@@ -617,7 +617,7 @@ static void MX_TIM3_Init(void) {
 
     /* USER CODE END TIM3_Init 1 */
     htim3.Instance = TIM3;
-    htim3.Init.Prescaler = 2000;
+    htim3.Init.Prescaler = 700;
     htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
     htim3.Init.Period = 9999;
     htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
