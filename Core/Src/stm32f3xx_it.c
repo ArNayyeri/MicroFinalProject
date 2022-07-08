@@ -166,43 +166,16 @@ const int spring_plat = 3;
 const int black_hole = 4;
 const int alien = 5;
 
-/*
-const int plat = 0;                            //platform_char
-const int broken_plat = 1;                    //broken_plat_char
-const int spring_plat = 2;                    //spring_plat_char
-const int black_hole = 3;                    //black_hole_char
-const int alien = 4;                        //alien_char
-const int player_blank = 5;                    //player_char
-const int p_on_plat = 6;                    //player_char -> p_on_plat_char
-const int p_on_broken_plat = 7;                //player_char -> p_on_broken_plat_char
-const int p_on_spring_plat = 8;                //player_char -> p_on_spring_plat_char
-const int p_on_alien = 9;                    //player_char ? ? ?
-const int p_on_black_hole = 10;                //player_char ? ? ?
-const int bullet_blank = 11;                //bullet_char
-const int bullet_on_plat = 12;                //bullet_char -> bullet_on_plat_char
-const int bullet_on_broken_plat = 13;        //bullet_char -> bullet_on_broken_plat_char
-const int bullet_on_spring_plat = 14;        //bullet_char -> bullet_on_spring_plat
-const int bullet_on_black_hole = 15;        //bullet_char -> ?
-const int bullet_on_alien = 16;                //bullet_char -> ?
-const int blank = 20;
-*/
 bool wasFalling = true;
 const int player_initial_x = 1;
 const int player_initial_y = 18;
+int old_x = -1;
+int old_y = -1;
 int curr_y = -1;
 int curr_x = -1;
 int jump = 0;
 bool right_flag = false;
 bool left_flag = false;
-
-const int platform_char_indx = 0;
-const int broken_plat_char_indx = 1;
-const int spring_plat_char_indx = 2;
-const int black_hole_char_indx = 3;
-const int alien_char_indx = 4;
-const int player_char_indx = 5;
-const int bullet_char_indx = 6;
-const int death_char_indx = 7;
 
 int map[20][4];
 int old_map[20][4];
@@ -211,6 +184,8 @@ const int map_n = 4;
 const int half_board = 9;
 
 void copy_map(int old_map[map_m][map_n], int map[map_m][map_n]) {
+    old_x = curr_x;
+    old_y = curr_y;
     for (int i = 0; i < map_m; i++) {
         for (int j = 0; j < map_n; j++) {
             old_map[i][j] = map[i][j];
@@ -219,10 +194,6 @@ void copy_map(int old_map[map_m][map_n], int map[map_m][map_n]) {
 }
 
 void init_lcd();
-
-int update_map_not_falling(int map[map_m][map_n], int curr_y, int curr_x, int old_y, int old_x);
-
-void update_map_falling(int map[map_m][map_n], int curr_y, int curr_x, int old_y, int old_x);
 
 void update_lcd();
 
@@ -575,17 +546,19 @@ void TIM3_IRQHandler(void) {
             wasFalling = false;
             curr_y--;
             jump = 7;
-        } else if (map[curr_y - 1][curr_x] == spring_plat) {
+        } else if (map[curr_y + 1][curr_x] == spring_plat) {
             wasFalling = false;
             curr_y--;
             jump = 7;
-        } else if (map[curr_y - 1][curr_x] == broke_plat) {
-            map[curr_y][curr_x] = blank;
+        } else if (map[curr_y + 1][curr_x] == broke_plat) {
+            map[curr_y + 1][curr_x] = blank;
             curr_y++;
-        } else if (map[curr_y][curr_x] == blank) {
+        } else if (map[curr_y + 1][curr_x] == blank) {
             curr_y++;
         } else {
             // add if map[x][y-1] == alien | black hole
+
+            // check ? ?
         }
     } else {
         // wasJumping
@@ -593,7 +566,7 @@ void TIM3_IRQHandler(void) {
         if (jump > 0) {
             // still jumping
             curr_y--;
-            if (curr_y >= half_board) {
+            if (curr_y <= half_board) {
                 //shift map[rows[1->19]] one unit down
                 for (int i = 19; i >= 1; i--) {
                     for (int j = 0; j < 4; j++) {
@@ -747,9 +720,19 @@ void update_lcd() {
     for (int i = 0; i < map_m; i++) {
         for (int j = 0; j < map_n; j++) {
             if (i == curr_y && j == curr_x) {
-                // write player on lcd
-                setCursor(i, j);
-                write(5);
+                if (old_x != curr_x || old_y != curr_y) {
+                    // write player on lcd
+                    setCursor(curr_y, curr_x);
+                    write(5);
+
+                    // ********************************************************
+                    // in lcd, position [old_y][old_x] is currently displaying
+                    // player character, so we need to write the character of map
+                    // in that position instead, since the player is not in the
+                    // position [old_y][old_x] anymore
+                    setCursor(old_y, old_x);
+                    write_map_on_lcd(map[old_y][old_x], old_y, old_x);
+                }
             } else {
                 if (old_map[i][j] != map[i][j]) {
                     write_map_on_lcd(map[i][j], i, j);
@@ -772,6 +755,7 @@ void build_initial_map() {
         }
     }
 
+    map[curr_y][curr_x] = blank;
     map[curr_y + 1][curr_x] = plat;
 }
 
@@ -899,6 +883,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
                 // right shift
                 right_flag = true;
                 left_flag = false;
+                send_UART("right shift");
 
 
             } else if (status == status_end) {
@@ -934,6 +919,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
                 //left shift
                 left_flag = true;
                 right_flag = false;
+                send_UART("left shift");
             }
             break;
         case 9:
