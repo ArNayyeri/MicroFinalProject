@@ -65,7 +65,8 @@ unsigned char data;
 unsigned char buffer[100] = "";
 int position = 0;
 unsigned char name[100] = "Doodler";
-
+unsigned char current_char[2] = "1\0";
+int char_pos = 0;
 typedef unsigned char byte;
 
 
@@ -317,7 +318,7 @@ extern TIM_HandleTypeDef htim6;
 extern UART_HandleTypeDef huart4;
 /* USER CODE BEGIN EV */
 extern const int player_index, stair_index, broke_stair_index, coil_index, status_start, status_menu,
-        status_info, status_game, status_end;
+        status_info, status_game, status_end, status_select_name;
 extern int status;
 extern RTC_TimeTypeDef rTime;
 extern RTC_DateTypeDef rDate;
@@ -680,7 +681,7 @@ void ADC4_IRQHandler(void) {
     HAL_ADC_IRQHandler(&hadc4);
     /* USER CODE BEGIN ADC4_IRQn 1 */
     int x = HAL_ADC_GetValue(&hadc4);
-    x = x * 10 / 4095;
+    x = x * 10 / 4000;
     difficulty = x;
     /* USER CODE END ADC4_IRQn 1 */
 }
@@ -865,10 +866,43 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
         case 1:
             break;
         case 2:
-            /* code */
+            if (status == status_select_name) {
+                if (current_char[0] == 'a') {
+                    current_char[0] = 'b';
+                } else if (current_char[0] == 'b') {
+                    current_char[0] = 'c';
+                } else if (current_char[0] == 'c') {
+                    current_char[0] = 'A';
+                } else if (current_char[0] == 'A') {
+                    current_char[0] = 'B';
+                } else if (current_char[0] == 'B') {
+                    current_char[0] = 'C';
+                } else {
+                    current_char[0] = 'a';
+                }
+                setCursor(char_pos, 0);
+                print(current_char);
+            }
             break;
         case 3:
-            /* code */
+            if (status == status_select_name) {
+                if (current_char[0] == 'd') {
+                    current_char[0] = 'e';
+                } else if (current_char[0] == 'e') {
+                    current_char[0] = 'f';
+                } else if (current_char[0] == 'f') {
+                    current_char[0] = 'D';
+                } else if (current_char[0] == 'D') {
+                    current_char[0] = 'E';
+                } else if (current_char[0] == 'B') {
+                    current_char[0] = 'F';
+                } else {
+                    current_char[0] = 'd';
+                }
+
+                setCursor(char_pos, 0);
+                print(current_char);
+            }
             break;
         case 4:
             if (status == status_menu) {
@@ -891,13 +925,61 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
             }
             break;
         case 5:
-            /* code */
+            if (status == status_select_name) {
+                if (current_char[0] == 'g') {
+                    current_char[0] = 'h';
+                } else if (current_char[0] == 'h') {
+                    current_char[0] = 'i';
+                } else if (current_char[0] == 'i') {
+                    current_char[0] = 'G';
+                } else if (current_char[0] == 'G') {
+                    current_char[0] = 'H';
+                } else if (current_char[0] == 'H') {
+                    current_char[0] = 'I';
+                } else {
+                    current_char[0] = 'g';
+                }
+            }
             break;
         case 6:
-            /* code */
+            if (status == status_select_name) {
+                if (current_char[0] == 'j') {
+                    current_char[0] = 'k';
+                } else if (current_char[0] == 'k') {
+                    current_char[0] = 'l';
+                } else if (current_char[0] == 'l') {
+                    current_char[0] = 'J';
+                } else if (current_char[0] == 'J') {
+                    current_char[0] = 'K';
+                } else if (current_char[0] == 'K') {
+                    current_char[0] = 'L';
+                } else {
+                    current_char[0] = 'j';
+                }
+
+                setCursor(char_pos, 0);
+                print(current_char);
+            }
             break;
         case 7:
-            /* code */
+            if (status == status_select_name) {
+                if (current_char[0] == 'm') {
+                    current_char[0] = 'n';
+                } else if (current_char[0] == 'n') {
+                    current_char[0] = 'o';
+                } else if (current_char[0] == 'o') {
+                    current_char[0] = 'M';
+                } else if (current_char[0] == 'M') {
+                    current_char[0] = 'N';
+                } else if (current_char[0] == 'N') {
+                    current_char[0] = 'O';
+                } else {
+                    current_char[0] = 'm';
+                }
+
+                setCursor(char_pos, 0);
+                print(current_char);
+            }
             break;
         case 8:
             if (status == status_menu) {
@@ -920,25 +1002,98 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
                 left_flag = true;
                 right_flag = false;
                 send_UART("left shift");
+            } else if (status == status_select_name) {
+                strcat(name, current_char);
+                show_menu();
             }
             break;
         case 9:
-            /* code */
+            if (status == status_select_name) {
+                if (current_char[0] == 'p') {
+                    current_char[0] = 'q';
+                } else if (current_char[0] == 'q') {
+                    current_char[0] = 'r';
+                } else if (current_char[0] == 'r') {
+                    current_char[0] = 's';
+                } else if (current_char[0] == 's') {
+                    current_char[0] = 'P';
+                } else if (current_char[0] == 'P') {
+                    current_char[0] = 'Q';
+                } else if (current_char[0] == 'Q') {
+                    current_char[0] = 'R';
+                } else if (current_char[0] == 'R') {
+                    current_char[0] = 'S';
+                } else {
+                    current_char[0] = 'p';
+                }
+
+                setCursor(char_pos, 0);
+                print(current_char);
+            }
             break;
         case 10:
-            /* code */
+            if (status == status_select_name) {
+                if (current_char[0] == 't') {
+                    current_char[0] = 'u';
+                } else if (current_char[0] == 'u') {
+                    current_char[0] = 'v';
+                } else if (current_char[0] == 'v') {
+                    current_char[0] = 'T';
+                } else if (current_char[0] == 'T') {
+                    current_char[0] = 'U';
+                } else if (current_char[0] == 'U') {
+                    current_char[0] = 'V';
+                } else {
+                    current_char[0] = 't';
+                }
+
+                setCursor(char_pos, 0);
+                print(current_char);
+            }
             break;
         case 11:
-            /* code */
+            if (status == status_select_name) {
+                if (current_char[0] == 'w') {
+                    current_char[0] = 'x';
+                } else if (current_char[0] == 'x') {
+                    current_char[0] = 'y';
+                } else if (current_char[0] == 'y') {
+                    current_char[0] = 'z';
+                } else if (current_char[0] == 'z') {
+                    current_char[0] = 'W';
+                } else if (current_char[0] == 'W') {
+                    current_char[0] = 'X';
+                } else if (current_char[0] == 'X') {
+                    current_char[0] = 'Y';
+                } else if (current_char[0] == 'Y') {
+                    current_char[0] = 'Z';
+                } else {
+                    current_char[0] = 'w';
+                }
+
+                setCursor(char_pos, 0);
+                print(current_char);
+            }
             break;
         case 12:
-            /* code */
+            if (status == status_menu) {
+                status = status_select_name;
+                clear();
+                char_pos = 0;
+                current_char[0] = ' ';
+                strcpy(name, "");
+            }
             break;
         case 13:
             /* code */
             break;
         case 14:
-            /* code */
+            if (status == status_select_name) {
+                strcat(name, current_char);
+                current_char[0] = ' ';
+                char_pos += 1;
+
+            }
             break;
         case 15:
             /* code */
@@ -959,9 +1114,11 @@ void show_menu() {
     print("Start Game");
     setCursor(8, 1);
     print("About");
-    setCursor(0, 3);
+    setCursor(5, 2);
+    print("Select Name");
     char string[100];
     sprintf(string, "name : %s", name);
+    setCursor(0, 3);
     print(string);
 }
 
