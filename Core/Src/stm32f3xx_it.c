@@ -69,159 +69,76 @@ unsigned char name[100] = "Doodler";
 typedef unsigned char byte;
 
 
-byte platform_char[] = {
+// char bytes:
+
+// indx = 0
+byte plat_char[] = {
         0x00,
-        0x01,
-        0x01,
-        0x01,
-        0x01,
-        0x01,
-        0x01,
+        0x1C,
+        0x0C,
+        0x0C,
+        0x0C,
+        0x0C,
+        0x1C,
         0x00
 };
 
-byte broken_plat_char[] = {
+// indx = 1
+byte broke_plat_char[] = {
         0x00,
-        0x01,
-        0x01,
+        0x1C,
+        0x0C,
+        0x04,
         0x00,
-        0x00,
-        0x01,
-        0x01,
+        0x0C,
+        0x1C,
         0x00
 };
 
+// indx = 2
 byte spring_plat_char[] = {
         0x00,
-        0x15,
-        0x0B,
-        0x01,
-        0x01,
-        0x01,
-        0x01,
+        0x1C,
+        0x04,
+        0x14,
+        0x0C,
+        0x04,
+        0x1C,
         0x00
 };
 
+// indx = 3
 byte black_hole_char[] = {
         0x00,
         0x0E,
-        0x11,
-        0x11,
-        0x11,
-        0x11,
+        0x1F,
+        0x1F,
+        0x1F,
+        0x1F,
         0x0E,
         0x00
 };
 
-
+// indx = 4
 byte alien_char[] = {
         0x11,
         0x0A,
-        0x06,
-        0x0E,
-        0x0E,
-        0x06,
+        0x04,
+        0x1F,
+        0x1F,
+        0x04,
         0x0A,
         0x11
 };
 
+// indx = 5
 byte player_char[] = {
         0x00,
         0x00,
-        0x00,
-        0x16,
-        0x16,
+        0x17,
+        0x17,
         0x1E,
-        0x0C,
-        0x00
-};
-
-
-byte p_on_plat_char[] = {
-        0x00,
-        0x01,
-        0x01,
-        0x17,
-        0x17,
-        0x1F,
-        0x0D,
-        0x00
-};
-
-
-byte p_on_broken_plat_char[] = {
-        0x00,
-        0x01,
-        0x01,
-        0x16,
-        0x16,
-        0x1F,
-        0x0D,
-        0x00
-};
-
-byte p_on_spring_plat_char[] = {
-        0x00,
-        0x15,
-        0x0B,
-        0x01,
-        0x17,
-        0x17,
-        0x1F,
-        0x0C
-};
-
-byte bullet_char[] = {
-        0x00,
-        0x00,
-        0x00,
-        0x0C,
-        0x0C,
-        0x00,
-        0x00,
-        0x00
-};
-
-byte bullet_on_plat_char[] = {
-        0x00,
-        0x01,
-        0x01,
-        0x0D,
-        0x0D,
-        0x01,
-        0x01,
-        0x00
-};
-
-byte bullet_on_broken_plat_char[] = {
-        0x00,
-        0x01,
-        0x01,
-        0x0C,
-        0x0C,
-        0x01,
-        0x01,
-        0x00
-};
-
-byte bullet_on_spring_plat_char[] = {
-        0x00,
-        0x15,
-        0x0B,
-        0x0D,
-        0x0D,
-        0x01,
-        0x01,
-        0x00
-};
-
-byte death_char[] = {
-        0x00,
-        0x11,
-        0x0A,
-        0x04,
-        0x0A,
-        0x11,
+        0x0E,
         0x00,
         0x00
 };
@@ -239,7 +156,17 @@ void end_game();
 
 void setup_melody(int melody[], int size_arr);
 
+void fill_new_row(int new_row[]);
 
+// map[][] values:
+const int blank = 0;
+const int plat = 1;
+const int broke_plat = 2;
+const int spring_plat = 3;
+const int black_hole = 4;
+const int alien = 5;
+
+/*
 const int plat = 0;                            //platform_char
 const int broken_plat = 1;                    //broken_plat_char
 const int spring_plat = 2;                    //spring_plat_char
@@ -258,18 +185,15 @@ const int bullet_on_spring_plat = 14;        //bullet_char -> bullet_on_spring_p
 const int bullet_on_black_hole = 15;        //bullet_char -> ?
 const int bullet_on_alien = 16;                //bullet_char -> ?
 const int blank = 20;
-int char_map[20];
-
-bool isFalling = false;
-int curr_y = 19;
-int curr_x = 1;
-int jump = 7;
-
-int get_custom_char_index(int value) {
-    // update customChar if needed (if player on plat and...)
-    return char_map[value];
-
-}
+*/
+bool wasFalling = true;
+const int player_initial_x = 1;
+const int player_initial_y = 18;
+int curr_y = -1;
+int curr_x = -1;
+int jump = 0;
+bool right_flag = false;
+bool left_flag = false;
 
 const int platform_char_indx = 0;
 const int broken_plat_char_indx = 1;
@@ -284,7 +208,7 @@ int map[20][4];
 int old_map[20][4];
 const int map_m = 20;
 const int map_n = 4;
-const int half_board = 10;
+const int half_board = 9;
 
 void copy_map(int old_map[map_m][map_n], int map[map_m][map_n]) {
     for (int i = 0; i < map_m; i++) {
@@ -303,7 +227,7 @@ void update_map_falling(int map[map_m][map_n], int curr_y, int curr_x, int old_y
 void update_lcd();
 
 void reset_port_7segment() {
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, 0);
+    HAL_GPIO_WritePin(GPIOF, GPIO_PIN_4, 0);
 
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, 0);
 
@@ -311,13 +235,13 @@ void reset_port_7segment() {
 
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0);
 
-    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_7, 0);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 0);
 
-    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, 0);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
 
-    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, 0);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, 0);
 
-    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_10, 0);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, 0);
 
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, 1);
 
@@ -362,21 +286,21 @@ int BCDConversion(int n) {
 void set_number(int number, int pin) {
     int bcd = BCDConversion(number);
 
-    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_7, bcd % 10);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, bcd % 10);
     bcd /= 10;
 
-    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, bcd % 10);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, bcd % 10);
     bcd /= 10;
 
-    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, bcd % 10);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, bcd % 10);
     bcd /= 10;
 
-    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_10, bcd % 10);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, bcd % 10);
     bcd /= 10;
 
     switch (pin) {
         case 4:
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, 1);
+            HAL_GPIO_WritePin(GPIOF, GPIO_PIN_4, 1);
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, 0);
             break;
         case 3:
@@ -631,27 +555,82 @@ void TIM3_IRQHandler(void) {
     /* USER CODE END TIM3_IRQn 0 */
     HAL_TIM_IRQHandler(&htim3);
     /* USER CODE BEGIN TIM3_IRQn 1 */
-    //copy_map(old_map, map);
-    int old_y = curr_y;
-    int old_x = curr_x;
-    if (!isFalling) {
-        if (jump > 0) {
-            curr_y--;
-            jump--;
-            if (jump <= 0) isFalling = true;
 
-            curr_y = update_map_not_falling(map, curr_y, curr_x, old_y, old_x);
-        }
-
-    } else {
-        curr_y++;
-        update_map_falling(map, curr_y, curr_x, old_y, old_x);
+    if (right_flag == true) {
+        right_flag = false;
+        int new_x = curr_x;
+        new_x--;
+        if (new_x < 0) new_x = 3;
+        curr_x = new_x;
+    } else if (left_flag == true) {
+        left_flag = false;
+        int new_x = curr_x;
+        new_x++;
+        if (new_x > 3) new_x = 0;
+        curr_x = new_x;
     }
 
-    ///****** update lcd
-    update_lcd();
-    score++;
+    if (wasFalling) {
+        if (map[curr_y + 1][curr_x] == plat) {
+            wasFalling = false;
+            curr_y--;
+            jump = 7;
+        } else if (map[curr_y - 1][curr_x] == spring_plat) {
+            wasFalling = false;
+            curr_y--;
+            jump = 7;
+        } else if (map[curr_y - 1][curr_x] == broke_plat) {
+            map[curr_y][curr_x] = blank;
+            curr_y++;
+        } else if (map[curr_y][curr_x] == blank) {
+            curr_y++;
+        } else {
+            // add if map[x][y-1] == alien | black hole
+        }
+    } else {
+        // wasJumping
+        jump--;
+        if (jump > 0) {
+            // still jumping
+            curr_y--;
+            if (curr_y >= half_board) {
+                //shift map[rows[1->19]] one unit down
+                for (int i = 19; i >= 1; i--) {
+                    for (int j = 0; j < 4; j++) {
+                        map[i][j] = map[i - 1][j];
+                    }
+                }
 
+
+                //build new row
+                // build a specific function based on difficulty
+                int new_row[4];
+                fill_new_row(new_row);
+
+                //map[row[0]] = new_row
+                for (int j = 0; j < 4; j++) {
+                    map[0][j] = new_row[j];
+                }
+
+                curr_y++;
+            } else {
+                // nothing ? ? ?
+
+            }
+        } else {
+            //end of jump
+            wasFalling = true;
+            jump = 0;
+            // anythin else ? ? ?
+            // curr_y++ ? --
+        }
+    }
+
+
+    // update LCD
+    update_lcd();
+    copy_map(old_map, map);
+    score++;
     //copy_map(old_map, map);
     /* USER CODE END TIM3_IRQn 1 */
 }
@@ -735,155 +714,31 @@ void ADC4_IRQHandler(void) {
 
 /* USER CODE BEGIN 1 */
 
-int get_upper_map_value(int map[map_m][map_n], int curr_y, int curr_x, int old_y, int old_x) {
-    int result = -1;
-    if (map[old_y][old_x] == player_blank) result = blank;
-    if (map[old_y][old_x] == p_on_plat) result = plat;
-    if (map[old_y][old_x] == p_on_broken_plat) {
-        //result = blank;
-        result = broken_plat;
-    }
-    if (map[old_y][old_x] == p_on_spring_plat) result = spring_plat;
-    if (map[old_y][old_x] == p_on_alien) result = alien;
-    if (map[old_y][old_x] == p_on_black_hole) result = black_hole;
-
-    return result;
+void fill_new_row(int new_row[]) {
+    // fill new_row[0:4] based on difficulty
+    new_row[0] = 1;
+    new_row[1] = 1;
+    new_row[2] = 1;
+    new_row[3] = 1;
 }
 
-void update_map_falling(int map[map_m][map_n], int curr_y, int curr_x, int old_y, int old_x) {
-    copy_map(old_map, map);
-    // isFalling
-    if (curr_y > map_m) {
-        // lost, fell into ground...
+int get_custom_char_index(int value) {
+    if (value == plat) return 0;
+    else if (value == broke_plat) return 1;
+    else if (value == spring_plat) return 2;
+    else if (value == black_hole) return 3;
+    else if (value == alien) return 4;
+    else {
+        // should not happen
     }
-    if (map[curr_y][curr_x] == blank) {
-        map[curr_y][curr_x] = player_blank;
-
-        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
-    } else if (map[curr_y][curr_x] == broken_plat) {
-        map[curr_y][curr_x] = p_on_broken_plat;
-
-        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
-    } else if (map[curr_y][curr_x] == black_hole) {
-        map[curr_y][curr_x] = p_on_black_hole;
-        // LOSE
-
-        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
-    } else if (map[curr_y][curr_x] == alien) {
-        map[curr_y][curr_x] = p_on_alien;
-        // LOSE
-
-        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
-    } else if (map[curr_y][curr_x] == plat) {
-        map[curr_y][curr_x] = p_on_plat;
-
-        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
-
-        isFalling = false;
-        jump = 7;
-
-
-    } else if (map[curr_y][curr_x] == spring_plat) {
-        map[curr_y][curr_x] = p_on_spring_plat;
-
-        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
-
-        isFalling = true;
-        jump = 20;
-
-    } else {
-        //should not happen
-    }
-
-}
-
-int update_map_not_falling(int map[map_m][map_n], int curr_y, int curr_x, int old_y, int old_x) {
-    copy_map(old_map, map);
-    if (map[curr_y][curr_x] == blank) {
-        map[curr_y][curr_x] = player_blank;
-
-        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
-    } else if (map[curr_y][curr_x] == broken_plat) {
-        map[curr_y][curr_x] = p_on_broken_plat;
-
-        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
-    } else if (map[curr_y][curr_x] == black_hole) {
-        map[curr_y][curr_x] = p_on_black_hole;
-        // LOSE
-
-        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
-    } else if (map[curr_y][curr_x] == alien) {
-        map[curr_y][curr_x] = p_on_alien;
-        // LOSE
-
-        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
-    } else if (map[curr_y][curr_x] == plat) {
-        map[curr_y][curr_x] = p_on_plat;
-
-        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
-    } else if (map[curr_y][curr_x] == spring_plat) {
-        map[curr_y][curr_x] = p_on_spring_plat;
-
-        map[old_y][old_x] = get_upper_map_value(map, curr_y, curr_x, old_y, old_x);
-    } else {
-        //should not happen
-    }
-
-
-    if (curr_y <= half_board) {
-        //shift map[rows[1->19]] one unit down
-        for (int i = 19; i >= 1; i--) {
-            for (int j = 0; j < 4; j++) {
-                map[i][j] = map[i - 1][j];
-            }
-        }
-
-
-        //build new row
-        // build a specific function based on difficulty
-        int new_row[4] = {0, 0, 0, 0};
-
-
-        //map[row[0]] = new_row
-        for (int j = 0; j < 4; j++) {
-            map[0][j] = new_row[j];
-        }
-
-        return (curr_y + 1);
-
-        //curr_y++
-    } else {
-        // no shift in the map...
-
-        return curr_y;
-    }
-}
-
-void update_custom_chars(int map_value) {
-    if (map_value == player_blank) createChar(platform_char_indx, player_char);
-    if (map_value == p_on_plat) createChar(platform_char_indx, p_on_plat_char);
-    if (map_value == p_on_broken_plat) createChar(platform_char_indx, p_on_broken_plat_char);
-    if (map_value == p_on_spring_plat) createChar(platform_char_indx, p_on_spring_plat_char);
-
-
-    if (map_value == bullet_blank) createChar(bullet_char_indx, bullet_char);
-    if (map_value == bullet_on_plat) createChar(bullet_char_indx, bullet_on_plat_char);
-    if (map_value == bullet_on_broken_plat) createChar(bullet_char_indx, bullet_on_broken_plat_char);
-    if (map_value == bullet_on_spring_plat) createChar(bullet_char_indx, bullet_on_spring_plat_char);
-
-    // ? ?
-    if (map_value == bullet_on_black_hole) createChar(bullet_char_indx, black_hole_char);
-
-    // death ? ? ? ? ? ? ??
-    if (map_value == bullet_on_alien) createChar(bullet_char_indx, death_char);
-
 
 }
 
 void write_map_on_lcd(int map_value, int y, int x) {
     setCursor(y, x);
-    if (map_value == blank) print(" ");
-    else {
+    if (map_value == blank) {
+        print(" ");
+    } else {
         write(get_custom_char_index(map_value));
     }
 }
@@ -891,14 +746,71 @@ void write_map_on_lcd(int map_value, int y, int x) {
 void update_lcd() {
     for (int i = 0; i < map_m; i++) {
         for (int j = 0; j < map_n; j++) {
-            if (old_map[i][j] != map[i][j]) {
-                write_map_on_lcd(map[i][j], i, j);
+            if (i == curr_y && j == curr_x) {
+                // write player on lcd
+                setCursor(i, j);
+                write(5);
             } else {
-                // no update for block [i][j]
+                if (old_map[i][j] != map[i][j]) {
+                    write_map_on_lcd(map[i][j], i, j);
+                }
             }
         }
     }
+}
+
+void build_initial_map() {
+    for (int i = 0; i < 20; ++i) {
+        int random_col = rand() % 4;
+
+        for (int j = 0; j < 4; ++j) {
+            if (j != random_col) map[i][j] = blank;
+            else {
+                map[i][j] = plat;
+                //map[i][j] = blank;
+            }
+        }
+    }
+
+    map[curr_y + 1][curr_x] = plat;
+}
+
+void init_lcd() {
+    //player on [18][1]
+    curr_x = player_initial_x;
+    curr_y = player_initial_y;
+
+    createChar(0, plat_char);
+    createChar(1, broke_plat_char);
+    createChar(2, spring_plat_char);
+    createChar(3, black_hole_char);
+    createChar(4, alien_char);
+    createChar(5, player_char);
+
+    srand(HAL_GetTick());
+
+    // build initial map
+    build_initial_map();
+
     copy_map(old_map, map);
+
+    // init lcd:
+    for (int i = 19; i >= 0; i--) {
+        for (int j = 0; j < 4; ++j) {
+            setCursor(i, j);
+            if (i == curr_y && j == curr_x) {
+                write(5);
+            } else if (map[i][j] == blank) {
+                print(" ");
+            } else {
+                write(get_custom_char_index(map[i][j]));
+            }
+        }
+    }
+
+    // start the timer
+    HAL_TIM_Base_Start_IT(&htim3);
+
 }
 
 // Input pull down rising edge trigger interrupt pins:
@@ -978,27 +890,16 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
             if (status == status_menu) {
                 status = status_game;
                 HAL_TIM_Base_Start_IT(&htim4);
-                //init game
+                // init game
                 init_lcd();
 
             } else if (status == status_info) {
                 show_menu();
             } else if (status == status_game) {
-                //right shift
-                int old_y = curr_y;
-                int old_x = curr_x;
+                // right shift
+                right_flag = true;
+                left_flag = false;
 
-                curr_x--;
-                if (curr_x < 0) curr_x = map_n - 1;
-
-                if (isFalling) {
-                    update_map_falling(map, curr_y, curr_x, old_y, old_x);
-                } else {
-                    // not falling
-                    update_map_not_falling(map, curr_y, curr_x, old_y, old_x);
-                }
-
-                update_lcd();
 
             } else if (status == status_end) {
                 HAL_NVIC_SystemReset();
@@ -1031,21 +932,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
             } else if (status == status_game) {
                 //left shift
-
-                int old_y = curr_y;
-                int old_x = curr_x;
-
-                curr_x++;
-                if (curr_x >= map_n) curr_x = 0;
-
-                if (isFalling) {
-                    update_map_falling(map, curr_y, curr_x, old_y, old_x);
-                } else {
-                    // not falling
-                    update_map_not_falling(map, curr_y, curr_x, old_y, old_x);
-                }
-
-                update_lcd();
+                left_flag = true;
+                right_flag = false;
             }
             break;
         case 9:
@@ -1141,7 +1029,7 @@ void end_game() {
 }
 
 void setup_melody(int melody[], int size_arr) {
-    int tempo = 108;
+    int tempo = 180;
     int notes = size_arr / sizeof(melody[0]) / 2;
     int wholenote = (60000 * 4) / tempo;
     int divider = 0, noteDuration = 0;
@@ -1165,70 +1053,4 @@ void setup_melody(int melody[], int size_arr) {
     }
 }
 
-void init_lcd() {
-    char_map[plat] = 0;                //platform_char
-    char_map[broken_plat] = 1;            //broken_plat_char
-    char_map[spring_plat] = 2;            //spring_plat_char
-    char_map[black_hole] = 3;            //black_hole_char
-    char_map[alien] = 4;                //alien_char
-    char_map[player_blank] = 5;            //player_char
-    char_map[p_on_plat] = 5;            //player_char -> p_on_plat_char
-    char_map[p_on_broken_plat] = 5;        //player_char -> p_on_broken_plat_char
-    char_map[p_on_spring_plat] = 5;        //player_char -> p_on_spring_plat_char
-    char_map[p_on_alien] = 7;            //death_char
-    char_map[p_on_black_hole] = 7;        //death_char
-    char_map[bullet_blank] = 6;        //bullet_char
-    char_map[bullet_on_plat] = 6;        //bullet_char -> bullet_on_plat_char
-    char_map[bullet_on_broken_plat] = 6;//bullet_char -> bullet_on_broken_plat_char
-    char_map[bullet_on_spring_plat] = 6;//bullet_char -> bullet_on_spring_plat
-    char_map[bullet_on_black_hole] = 6;    //bullet_char ? ? ?
-    char_map[bullet_on_alien] = 6;        //bullet_char ? ? ?
-
-    createChar(0, platform_char);
-    createChar(1, broken_plat_char);
-    createChar(2, spring_plat_char);
-    createChar(4, black_hole_char);
-    createChar(5, player_char);
-    createChar(6, bullet_char);
-    createChar(7, death_char);
-
-
-    srand(HAL_GetTick());
-
-    // build initial map
-
-    //map[][] = 20 --> blank
-    for (int i = 0; i < 20; ++i) {
-        int random_col = rand() % 4;
-
-        for (int j = 0; j < 4; ++j) {
-            if (j != random_col) map[i][j] = blank;
-            else {
-                map[i][j] = plat;
-                //map[i][j] = blank;
-            }
-        }
-    }
-
-    //player on [1][2]
-    //createChar(player_char_indx, p_on_plat_char);
-    map[19][1] = p_on_plat;
-    copy_map(old_map, map);
-
-    // init lcd:
-    for (int i = 19; i >= 0; i--) {
-        for (int j = 0; j < 4; ++j) {
-            setCursor(i, j);
-            if (map[i][j] == blank) {
-                print(" ");
-            } else {
-                write(get_custom_char_index(map[i][j]));
-            }
-        }
-    }
-
-    // start the timer
-    HAL_TIM_Base_Start_IT(&htim3);
-
-}
 /* USER CODE END 1 */
