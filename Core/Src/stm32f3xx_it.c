@@ -64,7 +64,7 @@ int difficulty = 0;
 unsigned char data;
 unsigned char buffer[100] = "";
 int position = 0;
-unsigned char name[100] = "Doodler";
+char name[100] = "Doodler";
 unsigned char current_char[2] = "1\0";
 int char_pos = 0;
 int frq_counter = 0;
@@ -160,6 +160,10 @@ void setup_melody(int melody[], int size_arr);
 
 void fill_new_row();
 
+void shift_map();
+
+void fill_buffer(int diff);
+
 // map[][] values:
 const int blank = 0;
 const int plat = 1;
@@ -181,6 +185,10 @@ bool left_flag = false;
 
 int map[20][4];
 int old_map[20][4];
+const int row_buffer_size = 6;
+int row_buffer[6][4];
+int buffer_content = 0;
+
 const int map_m = 20;
 const int map_n = 4;
 const int half_board = 9;
@@ -549,19 +557,27 @@ void TIM3_IRQHandler(void) {
                 wasFalling = false;
                 curr_y--;
                 jump = 7;
+                if (curr_y <= half_board) {
+                    shift_map();
+                }
             } else if (map[curr_y + 1][curr_x] == spring_plat) {
                 wasFalling = false;
                 curr_y--;
-                jump = 7;
+                jump = 20;
+                if (curr_y <= half_board) {
+                    shift_map();
+                }
             } else if (map[curr_y + 1][curr_x] == broke_plat) {
                 map[curr_y + 1][curr_x] = blank;
                 curr_y++;
             } else if (map[curr_y + 1][curr_x] == blank) {
                 curr_y++;
-            } else {
-                // add if map[x][y-1] == alien | black hole
-
-                // check ? ?
+            } else if (map[curr_y + 1][curr_x] == alien) {
+                end_game();
+                return;
+            } else if (map[curr_y + 1][curr_x] == black_hole) {
+                end_game();
+                return;
             }
         } else {
             // wasJumping
@@ -569,21 +585,18 @@ void TIM3_IRQHandler(void) {
             if (jump > 0) {
                 // still jumping
                 curr_y--;
+
+                if (map[curr_y + 1][curr_x] == alien) {
+                    end_game();
+                    return;
+                } else if (map[curr_y + 1][curr_x] == black_hole) {
+                    end_game();
+                    return;
+                }
+
                 if (curr_y <= half_board) {
 
-                    curr_y++;
-                    //shift map[rows[1->19]] one unit down
-                    for (int i = 19; i >= 1; i--) {
-                        for (int j = 0; j < 4; j++) {
-                            map[i][j] = map[i - 1][j];
-                        }
-                    }
-
-
-                    // build new row
-                    // build a specific function based on difficulty
-                    //int new_row[4];
-                    fill_new_row();
+                    shift_map();
 
                 } else {
                     // nothing ? ? ?
@@ -687,14 +700,41 @@ void ADC4_IRQHandler(void) {
 
 /* USER CODE BEGIN 1 */
 
+void shift_map() {
+    curr_y++;
+    //shift map[rows[1->19]] one unit down
+    for (int i = 19; i >= 1; i--) {
+        for (int j = 0; j < 4; j++) {
+            map[i][j] = map[i - 1][j];
+        }
+    }
+
+    if (buffer_content < 0) {
+        fill_buffer(5);
+    }
+
+    for (int i = 0; i < 4; i++) {
+        map[0][i] = row_buffer[buffer_content][i];
+    }
+
+    buffer_content--;
+
+    // build new row
+    // build a specific function based on difficulty
+    // int new_row[4];
+    // fill_new_row();
+}
+
 int get_max(int a, int b) {
-    if(a > b) return a;
+    if (a > b) return a;
     else return b;
 }
+
 int get_min(int a, int b) {
-    if(a > b) return b;
+    if (a > b) return b;
     else return a;
 }
+
 int get_heighest_reachable_height(int new_map[20][4]) {
     // new_map vs lcd :
     // new_map[0, :]  = top most row of lcd
@@ -708,19 +748,18 @@ int get_heighest_reachable_height(int new_map[20][4]) {
     int last_reach = curr_y - jump;
 
     int result = 100000;
-    for(int i = curr_y; i >= 0; i--) {
+    for (int i = curr_y; i >= 0; i--) {
 
         int max_boost_in_row = -1;
-        for(int j = 0; j < 4; j++) {
-            if(new_map[i][j] == plat) {
-                if(last_reach <=  i-1) {
-                    result = get_min(result, i-7);
+        for (int j = 0; j < 4; j++) {
+            if (new_map[i][j] == plat) {
+                if (last_reach <= i - 1) {
+                    result = get_min(result, i - 7);
                     max_boost_in_row = get_max(max_boost_in_row, 7);
                 }
-            }
-            else if(new_map[i][j] == spring_plat) {
-                if(last_reach <= i-1) {
-                    result = get_min(result, i-20);
+            } else if (new_map[i][j] == spring_plat) {
+                if (last_reach <= i - 1) {
+                    result = get_min(result, i - 20);
                     max_boost_in_row = get_max(max_boost_in_row, 20);
                 }
             }
@@ -838,6 +877,83 @@ void fill_new_row() {
 
 }
 
+void fill_buffer(int diff) {
+    for (int i = 0; i < row_buffer_size; i++) {
+        for (int j = 0; j < 4; j++) {
+            row_buffer[i][j] = 0;
+        }
+    }
+    int selected_rows[row_buffer_size];
+    for (int i = 0; i < row_buffer_size; ++i) {
+        selected_rows[i] = 0;
+    }
+
+    if (diff == 0) {
+
+        int base = rand() % row_buffer_size;
+        int interval = rand() % (row_buffer_size - 1) + 1;
+
+        // fill plats
+        for (int i = 0; i < 3; i++) {
+            selected_rows[(base + (interval * i)) % row_buffer_size] = plat;
+        }
+
+        // fill the rest with springs
+        for (int i = 0; i < 6; i++) {
+            if (selected_rows[i] == 0) selected_rows[i] = spring_plat; // spring
+        }
+
+        for (int i = 0; i < row_buffer_size; ++i) {
+            int rand_col = rand() % 4;
+            for (int j = 0; j < 4; j++) {
+                if (j == rand_col) {
+                    row_buffer[i][j] = selected_rows[i];
+                }
+            }
+        }
+    } else if (diff == 5) {
+        // 2 plat
+        // 1 alien
+        // 1 black hole
+        // 1 blank
+
+        int base = rand() % row_buffer_size;
+        int interval = rand() % (row_buffer_size - 1) + 1;
+
+        // fill plats
+        for (int i = 0; i < 2; i++) {
+            selected_rows[(base + (interval * i)) % row_buffer_size] = plat;
+        }
+
+        bool alien_c = false;
+        bool black_hole_c = false;
+
+        // fill the rest with springs
+        for (int i = 0; i < 6; i++) {
+            if (selected_rows[i] == 0) {
+                if (!alien_c) {
+                    selected_rows[i] = alien;
+                    alien_c = true;
+                } else if (!black_hole_c) {
+                    selected_rows[i] = black_hole;
+                    black_hole_c = true;
+                }
+            }
+        }
+
+        for (int i = 0; i < row_buffer_size; ++i) {
+            int rand_col = rand() % 4;
+            for (int j = 0; j < 4; j++) {
+                if (j == rand_col) {
+                    row_buffer[i][j] = selected_rows[i];
+                }
+            }
+        }
+    }
+
+    buffer_content = row_buffer_size - 1;
+
+}
 
 int get_custom_char_index(int value) {
     if (value == plat) return 0;
@@ -1302,7 +1418,11 @@ void send_UART(char *string) {
 }
 
 void end_game() {
-    clear();
+    status = status_end;
+    HAL_TIM_Base_Stop_IT(&htim3);
+    HAL_TIM_Base_Stop_IT(&htim4);
+    reset_port_7segment();
+    begin(20, 4);
     setCursor(3, 0);
     print(name);
     char string[100] = "";
