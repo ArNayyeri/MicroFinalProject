@@ -189,6 +189,10 @@ const int row_buffer_size = 6;
 int row_buffer[6][4];
 int buffer_content = 0;
 
+int bullets_pos[20][2];
+bool shot_fired = false;
+const int in_active_bullet = -5;
+
 const int map_m = 20;
 const int map_n = 4;
 const int half_board = 9;
@@ -537,6 +541,49 @@ void TIM3_IRQHandler(void) {
     HAL_TIM_IRQHandler(&htim3);
     /* USER CODE BEGIN TIM3_IRQn 1 */
 
+    // shot fired gets checked regardless of frq_counter
+    if (shot_fired) {
+        shot_fired = false;
+        // find a non-active bullet:
+        // (non active bullets have [-1][-1] as their position)
+        for (int i = 0; i < 20; i++) {
+            if (bullets_pos[i][0] == in_active_bullet && bullets_pos[i][1] == in_active_bullet) {
+                // active the non active bullet
+                bullets_pos[i][0] = curr_y; // ???????????????? curr_y -1 ???????????????
+                bullets_pos[i][1] = curr_x;
+                break;
+            }
+        }
+    }
+
+
+    // bullets gets updated regardless of value of frq_counter
+
+    // update bullets position:
+    for (int i = 0; i < 20; i++) {
+        // if bullet is active, update position
+        if (bullets_pos[i][0] != in_active_bullet && bullets_pos[i][1] != in_active_bullet) {
+            bullets_pos[i][0]--;
+        }
+    }
+
+    // check colision
+    for (int curr_bullet = 0; curr_bullet < 20; curr_bullet++) {
+        int by = bullets_pos[curr_bullet][0];
+        int bx = bullets_pos[curr_bullet][1];
+
+        if (by != in_active_bullet && bx != in_active_bullet) {
+            if (map[by][bx] == alien) {
+                // alien on [by][bx] is dead
+                map[by][bx] = blank;
+                // bullet in active
+                bullets_pos[curr_bullet][0] = in_active_bullet;
+                bullets_pos[curr_bullet][1] = in_active_bullet;
+            }
+        }
+
+    }
+
     if (!frq_counter) {
         if (right_flag == true) {
             right_flag = false;
@@ -611,11 +658,25 @@ void TIM3_IRQHandler(void) {
             }
         }
 
-        // update LCD
-        update_lcd();
-        copy_map(old_map, map);
+        if (curr_y >= 19) {
+            // end game
+            end_game();
+            return;
+        }
+
         score++;
         //copy_map(old_map, map);
+    }
+    // update LCD
+    update_lcd();
+    copy_map(old_map, map);
+
+    //check for in-active bullets:
+    for (int i = 0; i < 20; i++) {
+        if (bullets_pos[i][0] < 0) {
+            bullets_pos[i][0] = in_active_bullet;
+            bullets_pos[i][1] = in_active_bullet;
+        }
     }
     frq_counter = (frq_counter + 1) % 3;
     /* USER CODE END TIM3_IRQn 1 */
@@ -701,7 +762,17 @@ void ADC4_IRQHandler(void) {
 /* USER CODE BEGIN 1 */
 
 void shift_map() {
+    //update player "y"
     curr_y++;
+
+    // update bullets "y"
+    for (int i = 0; i < 20; ++i) {
+        if (bullets_pos[i][0] != in_active_bullet && bullets_pos[i][1] != in_active_bullet) {
+            bullets_pos[i][0]++;
+        }
+    }
+
+
     //shift map[rows[1->19]] one unit down
     for (int i = 19; i >= 1; i--) {
         for (int j = 0; j < 4; j++) {
@@ -733,148 +804,6 @@ int get_max(int a, int b) {
 int get_min(int a, int b) {
     if (a > b) return b;
     else return a;
-}
-
-int get_heighest_reachable_height(int new_map[20][4]) {
-    // new_map vs lcd :
-    // new_map[0, :]  = top most row of lcd
-    // new_map[1, :]  = second to top most row of lcd
-    // ...
-    // new_map[19, :] = bottom most row of lcd
-
-    // find last reachable platfrom
-    // return last_reahcbel_platform.y + 7/20
-
-    int last_reach = curr_y - jump;
-
-    int result = 100000;
-    for (int i = curr_y; i >= 0; i--) {
-
-        int max_boost_in_row = -1;
-        for (int j = 0; j < 4; j++) {
-            if (new_map[i][j] == plat) {
-                if (last_reach <= i - 1) {
-                    result = get_min(result, i - 7);
-                    max_boost_in_row = get_max(max_boost_in_row, 7);
-                }
-            } else if (new_map[i][j] == spring_plat) {
-                if (last_reach <= i - 1) {
-                    result = get_min(result, i - 20);
-                    max_boost_in_row = get_max(max_boost_in_row, 20);
-                }
-            }
-        }
-
-        last_reach -= last_reach;
-    }
-
-    /*int result = +1000;
-    // iteration starts from curr_y
-    int temp_jump = jump;
-    for (int i = curr_y+1; i >= 0; i--) {
-
-        for (int j = 0; j < 4; j++) {
-
-            if (new_map[i][j] == plat) {
-
-                bool is_reachable_height_wise = true;
-                if (curr_y - temp_jump >= i - 1) is_reachable_height_wise = false;
-                else is_reachable_height_wise = true;
-
-                if (is_reachable_height_wise) {
-                    if (result > i - 7) {
-                        result = i - 7;
-                    }
-                }
-            }
-            else if (new_map[i][j] == spring_plat) {
-
-                bool is_reachable_height_wise = true;
-                if (curr_y - jump >= i - 1) is_reachable_height_wise = false;
-                else is_reachable_height_wise = true;
-
-                if (is_reachable_height_wise) {
-                    if (result > i - 20) {
-                        result = i - 20;
-                    }
-                }
-            }
-        }
-    }
-    */
-    return result;
-}
-
-bool check_possible(int new_map[20][4]) {
-    bool result = false;
-    int highest_reachable_height = get_heighest_reachable_height(new_map);
-
-    if (highest_reachable_height <= -1) {
-        result = true;
-    }
-
-    return result;
-}
-
-int get_block(int rand_chance) {
-
-    // ignore difficulty for now...
-    int blank_chance = 45;
-    int plat_chance = 85;
-    int broke_plat_chance = 95;
-    int spring_plat_chance = 100;
-
-    if (rand_chance <= blank_chance) {
-        return blank;
-    } else if (rand_chance <= plat_chance) {
-        return plat;
-    } else if (rand_chance <= broke_plat_chance) {
-        return broke_plat;
-    } else if (rand_chance <= spring_plat_chance) {
-        return spring_plat;
-    }
-    return -1;
-    // return blank, plat, broke_plat, spring_plat, black_hole or alien const int based on rand_chance
-}
-
-void fill_new_row() {
-    // fill new_row[0:4] based on difficulty
-    // fil map[0, :]
-    int new_map[20][4];
-
-    // copy map to new map
-    for (int i = 0; i < 20; i++) {
-        for (int j = 0; j < 4; j++) {
-            new_map[i][j] = map[i][j];
-        }
-    }
-
-    // fill new_map[0, :] with new values
-    // based on difficulty
-    int blank_chance;
-    int plat_chance;
-    int broke_plat_chance;
-    int spring_plat_chance;
-
-    do {
-        int rand_chance = rand() % 100;
-        int new_block = get_block(rand_chance);
-
-        int rand_col = rand() % 4;
-
-        for (int i = 0; i < 4; i++) {
-            if (i != rand_col) new_map[0][i] = blank;
-            else new_map[0][i] = new_block;
-        }
-    } while (check_possible(new_map));
-
-    // copy new_map[0, :] to map
-    for (int i = 0; i < 20; i++) {
-        for (int j = 0; j < 4; j++) {
-            map[i][j] = new_map[i][j];
-        }
-    }
-
 }
 
 void fill_buffer(int diff) {
@@ -994,7 +923,28 @@ void update_lcd() {
                     write_map_on_lcd(map[old_y][old_x], old_y, old_x);
                 }
             } else {
-                if (old_map[i][j] != map[i][j]) {
+                // print bullets first
+                bool is_bullet = false;
+                bool was_bullet = false;
+                for (int bull = 0; bull < 20; bull++) {
+                    if (bullets_pos[bull][0] != in_active_bullet && bullets_pos[bull][1] != in_active_bullet) {
+                        // active bullet
+                        if (bullets_pos[bull][0] == i && bullets_pos[bull][1] == j) {
+                            is_bullet = true;
+                            setCursor(i, j);
+                            print(".");
+
+                            //break ? ? ? ??
+                        }
+                        if (bullets_pos[bull][0] == i - 1) {
+                            was_bullet = true;
+                        }
+                    }
+                }
+                if (was_bullet && !is_bullet) {
+                    // if it "was" bullet
+                    write_map_on_lcd(map[i][j], i, j);
+                } else if (!is_bullet && !was_bullet && old_map[i][j] != map[i][j]) {
                     write_map_on_lcd(map[i][j], i, j);
                 }
             }
@@ -1023,6 +973,11 @@ void init_lcd() {
     //player on [18][1]
     curr_x = player_initial_x;
     curr_y = player_initial_y;
+
+    for (int i = 0; i < 20; ++i) {
+        bullets_pos[i][0] = in_active_bullet;
+        bullets_pos[i][1] = in_active_bullet;
+    }
 
     createChar(0, plat_char);
     createChar(1, broke_plat_char);
@@ -1341,6 +1296,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
                 char_pos = 0;
                 current_char[0] = ' ';
                 strcpy(name, "");
+            } else if (status == status_game) {
+                shot_fired = true;
             }
             break;
         case 13:
