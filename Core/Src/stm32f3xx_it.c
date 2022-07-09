@@ -182,14 +182,19 @@ int curr_x = -1;
 int jump = 0;
 bool right_flag = false;
 bool left_flag = false;
+bool alien_collision = false;
 
 int map[20][4];
 int old_map[20][4];
-const int row_buffer_size = 6;
-int row_buffer[6][4];
+
+const int row_buffer_size = 10;
+int row_buffer[10][4];
 int buffer_content = 0;
+const int num_of_elements = 6;
+int ps[6][2];
 
 int bullets_pos[20][2];
+int old_bullets_pos[20][2];
 bool shot_fired = false;
 const int in_active_bullet = -5;
 
@@ -204,6 +209,13 @@ void copy_map(int old_map[map_m][map_n], int map[map_m][map_n]) {
         for (int j = 0; j < map_n; j++) {
             old_map[i][j] = map[i][j];
         }
+    }
+}
+
+void copy_bullets_pos(int old[20][2], int curr[20][2]) {
+    for (int i = 0; i < 20; i++) {
+        old[i][0] = curr[i][0];
+        old[i][1] = curr[i][1];
     }
 }
 
@@ -541,135 +553,146 @@ void TIM3_IRQHandler(void) {
     HAL_TIM_IRQHandler(&htim3);
     /* USER CODE BEGIN TIM3_IRQn 1 */
 
-    // shot fired gets checked regardless of frq_counter
-    if (shot_fired) {
-        shot_fired = false;
-        // find a non-active bullet:
-        // (non active bullets have [-1][-1] as their position)
+    if (!alien_collision) {
+        // shot fired gets checked regardless of frq_counter
+        if (shot_fired) {
+            shot_fired = false;
+            // find a non-active bullet:
+            // (non active bullets have [-1][-1] as their position)
+            for (int i = 0; i < 20; i++) {
+                if (bullets_pos[i][0] == in_active_bullet && bullets_pos[i][1] == in_active_bullet) {
+                    // active the non active bullet
+                    bullets_pos[i][0] = curr_y; // ???????????????? curr_y -1 ???????????????
+                    bullets_pos[i][1] = curr_x;
+                    break;
+                }
+            }
+        }
+
+
+        // bullets gets updated regardless of value of frq_counter
+
+        // update bullets position:
         for (int i = 0; i < 20; i++) {
-            if (bullets_pos[i][0] == in_active_bullet && bullets_pos[i][1] == in_active_bullet) {
-                // active the non active bullet
-                bullets_pos[i][0] = curr_y; // ???????????????? curr_y -1 ???????????????
-                bullets_pos[i][1] = curr_x;
-                break;
-            }
-        }
-    }
-
-
-    // bullets gets updated regardless of value of frq_counter
-
-    // update bullets position:
-    for (int i = 0; i < 20; i++) {
-        // if bullet is active, update position
-        if (bullets_pos[i][0] != in_active_bullet && bullets_pos[i][1] != in_active_bullet) {
-            bullets_pos[i][0]--;
-        }
-    }
-
-    // check colision
-    for (int curr_bullet = 0; curr_bullet < 20; curr_bullet++) {
-        int by = bullets_pos[curr_bullet][0];
-        int bx = bullets_pos[curr_bullet][1];
-
-        if (by != in_active_bullet && bx != in_active_bullet) {
-            if (map[by][bx] == alien) {
-                // alien on [by][bx] is dead
-                map[by][bx] = blank;
-                // bullet in active
-                bullets_pos[curr_bullet][0] = in_active_bullet;
-                bullets_pos[curr_bullet][1] = in_active_bullet;
+            // if bullet is active, update position
+            if (bullets_pos[i][0] != in_active_bullet && bullets_pos[i][1] != in_active_bullet) {
+                bullets_pos[i][0]--;
             }
         }
 
-    }
+        // check colision
+        for (int curr_bullet = 0; curr_bullet < 20; curr_bullet++) {
+            int by = bullets_pos[curr_bullet][0];
+            int bx = bullets_pos[curr_bullet][1];
 
-    if (!frq_counter) {
-        if (right_flag == true) {
-            right_flag = false;
-            int new_x = curr_x;
-            new_x--;
-            if (new_x < 0) new_x = 3;
-            curr_x = new_x;
-        } else if (left_flag == true) {
-            left_flag = false;
-            int new_x = curr_x;
-            new_x++;
-            if (new_x > 3) new_x = 0;
-            curr_x = new_x;
-        }
-
-        if (wasFalling) {
-            if (map[curr_y + 1][curr_x] == plat) {
-                wasFalling = false;
-                curr_y--;
-                jump = 7;
-                if (curr_y <= half_board) {
-                    shift_map();
+            if (by != in_active_bullet && bx != in_active_bullet) {
+                if (map[by][bx] == alien) {
+                    // alien on [by][bx] is dead
+                    map[by][bx] = blank;
+                    // bullet in active
+                    bullets_pos[curr_bullet][0] = in_active_bullet;
+                    bullets_pos[curr_bullet][1] = in_active_bullet;
                 }
-            } else if (map[curr_y + 1][curr_x] == spring_plat) {
-                wasFalling = false;
-                curr_y--;
-                jump = 20;
-                if (curr_y <= half_board) {
-                    shift_map();
-                }
-            } else if (map[curr_y + 1][curr_x] == broke_plat) {
-                map[curr_y + 1][curr_x] = blank;
-                curr_y++;
-            } else if (map[curr_y + 1][curr_x] == blank) {
-                curr_y++;
-            } else if (map[curr_y + 1][curr_x] == alien) {
-                end_game();
-                return;
-            } else if (map[curr_y + 1][curr_x] == black_hole) {
-                end_game();
-                return;
             }
-        } else {
-            // wasJumping
-            jump--;
-            if (jump > 0) {
-                // still jumping
-                curr_y--;
 
-                if (map[curr_y + 1][curr_x] == alien) {
-                    end_game();
-                    return;
+        }
+
+
+        if (!frq_counter) {
+            if (right_flag == true) {
+                right_flag = false;
+                int new_x = curr_x;
+                new_x--;
+                if (new_x < 0) new_x = 3;
+                curr_x = new_x;
+            } else if (left_flag == true) {
+                left_flag = false;
+                int new_x = curr_x;
+                new_x++;
+                if (new_x > 3) new_x = 0;
+                curr_x = new_x;
+            }
+
+            if (wasFalling) {
+                if (map[curr_y + 1][curr_x] == plat) {
+                    wasFalling = false;
+                    curr_y--;
+                    jump = 7;
+                    if (curr_y <= half_board) {
+                        shift_map();
+                    }
+                } else if (map[curr_y + 1][curr_x] == spring_plat) {
+                    wasFalling = false;
+                    curr_y--;
+                    jump = 20;
+                    if (curr_y <= half_board) {
+                        shift_map();
+                    }
+                } else if (map[curr_y + 1][curr_x] == broke_plat) {
+                    map[curr_y + 1][curr_x] = blank;
+                    curr_y++;
+                } else if (map[curr_y + 1][curr_x] == blank) {
+                    curr_y++;
+                } else if (map[curr_y + 1][curr_x] == alien) {
+                    alien_collision = true;
+                    //end_game();
+                    //return;
                 } else if (map[curr_y + 1][curr_x] == black_hole) {
                     end_game();
                     return;
                 }
-
-                if (curr_y <= half_board) {
-
-                    shift_map();
-
-                } else {
-                    // nothing ? ? ?
-
-                }
             } else {
-                //end of jump
-                wasFalling = true;
-                jump = 0;
-                // anythin else ? ? ?
-                // curr_y++ ? --
+                // wasJumping
+                jump--;
+                if (jump > 0) {
+                    // still jumping
+                    curr_y--;
+
+                    if (map[curr_y + 1][curr_x] == alien) {
+                        alien_collision = true;
+                        //end_game();
+                        //return;
+                    } else if (map[curr_y + 1][curr_x] == black_hole) {
+                        end_game();
+                        return;
+                    }
+
+                    if (curr_y <= half_board) {
+
+                        shift_map();
+
+                    } else {
+                        // nothing ? ? ?
+
+                    }
+                } else {
+                    //end of jump
+                    wasFalling = true;
+                    jump = 0;
+                    // anythin else ? ? ?
+                    // curr_y++ ? --
+                }
             }
+            score++;
         }
-
-        if (curr_y >= 19) {
-            // end game
-            end_game();
-            return;
+    } else {
+        //alien_collision = true
+        curr_y++;
+    }
+    if (curr_y >= 19) {
+        if (alien_collision) {
+            // game ended cause collided with alien
+        } else {
+            // game ended cause ?
         }
-
-        score++;
-        //copy_map(old_map, map);
+        // end game
+        end_game();
+        return;
     }
     // update LCD
     update_lcd();
     copy_map(old_map, map);
+
 
     //check for in-active bullets:
     for (int i = 0; i < 20; i++) {
@@ -678,6 +701,9 @@ void TIM3_IRQHandler(void) {
             bullets_pos[i][1] = in_active_bullet;
         }
     }
+
+    copy_bullets_pos(old_bullets_pos, bullets_pos);
+
     frq_counter = (frq_counter + 1) % 3;
     /* USER CODE END TIM3_IRQn 1 */
 }
@@ -781,7 +807,7 @@ void shift_map() {
     }
 
     if (buffer_content < 0) {
-        fill_buffer(5);
+        fill_buffer(0);
     }
 
     for (int i = 0; i < 4; i++) {
@@ -806,76 +832,72 @@ int get_min(int a, int b) {
     else return a;
 }
 
-void fill_buffer(int diff) {
-    for (int i = 0; i < row_buffer_size; i++) {
-        for (int j = 0; j < 4; j++) {
-            row_buffer[i][j] = 0;
-        }
-    }
-    int selected_rows[row_buffer_size];
-    for (int i = 0; i < row_buffer_size; ++i) {
-        selected_rows[i] = 0;
+void make_ps(int diff) {
+    // map values:
+    /*
+    const int blank = 0;
+    const int plat = 1;
+    const int broke_plat = 2;
+    const int spring_plat = 3;
+    const int black_hole = 4;
+    const int alien = 5;
+    */
+
+    // ps[i][0] -> value of object i in the map[][]
+    // ps[i][1] -> # of object i in the buffer based on difficulty
+
+
+    int c_temp[6];
+    // [0] - blank_ps_count
+    // [1] - plat_ps_count
+    // [2] - broke_plat_ps_count
+    // [3] - spring_plat_ps_count
+    // [4] - black_hole_ps_count
+    // [5] - alien_ps_count
+
+    for (int i = 0; i < num_of_elements; i++) {
+        ps[i][0] = i;
     }
 
     if (diff == 0) {
+        ps[0][1] = 3;
+        ps[1][1] = 4;
+        ps[2][1] = 0;
+        ps[3][1] = 0;
+        ps[4][1] = 2;
+        ps[5][1] = 1;
+    }
+}
 
-        int base = rand() % row_buffer_size;
-        int interval = rand() % (row_buffer_size - 1) + 1;
+void fill_buffer(int diff) {
+    // ps[i][0] -> value of object i in the map[][]
+    // ps[i][1] -> # of object i in the buffer based on difficulty
+    make_ps(diff);
 
-        // fill plats
-        for (int i = 0; i < 3; i++) {
-            selected_rows[(base + (interval * i)) % row_buffer_size] = plat;
+    int row_select_map[row_buffer_size];
+    for (int i = 0; i < row_buffer_size; i++) {
+        row_select_map[i] = -1;
+    }
+
+    for (int i = 0; i < num_of_elements; i++) {
+        int num_of_object = ps[i][1];
+        // ps[i][0] -> value of object in the map
+        for (int j = 0; j < num_of_object; j++) {
+            int curr_row = -1;
+            do {
+                curr_row = (rand() + i * i) % row_buffer_size;
+            } while (row_select_map[curr_row] != -1);
+            row_select_map[curr_row] = ps[i][0];
         }
+    }
 
-        // fill the rest with springs
-        for (int i = 0; i < 6; i++) {
-            if (selected_rows[i] == 0) selected_rows[i] = spring_plat; // spring
-        }
-
-        for (int i = 0; i < row_buffer_size; ++i) {
-            int rand_col = rand() % 4;
-            for (int j = 0; j < 4; j++) {
-                if (j == rand_col) {
-                    row_buffer[i][j] = selected_rows[i];
-                }
-            }
-        }
-    } else if (diff == 5) {
-        // 2 plat
-        // 1 alien
-        // 1 black hole
-        // 1 blank
-
-        int base = rand() % row_buffer_size;
-        int interval = rand() % (row_buffer_size - 1) + 1;
-
-        // fill plats
-        for (int i = 0; i < 2; i++) {
-            selected_rows[(base + (interval * i)) % row_buffer_size] = plat;
-        }
-
-        bool alien_c = false;
-        bool black_hole_c = false;
-
-        // fill the rest with springs
-        for (int i = 0; i < 6; i++) {
-            if (selected_rows[i] == 0) {
-                if (!alien_c) {
-                    selected_rows[i] = alien;
-                    alien_c = true;
-                } else if (!black_hole_c) {
-                    selected_rows[i] = black_hole;
-                    black_hole_c = true;
-                }
-            }
-        }
-
-        for (int i = 0; i < row_buffer_size; ++i) {
-            int rand_col = rand() % 4;
-            for (int j = 0; j < 4; j++) {
-                if (j == rand_col) {
-                    row_buffer[i][j] = selected_rows[i];
-                }
+    for (int i = 0; i < row_buffer_size; i++) {
+        int rand_col = rand() % 4;
+        for (int j = 0; j < 4; j++) {
+            if (j == rand_col) {
+                row_buffer[i][j] = row_select_map[i];
+            } else {
+                row_buffer[i][j] = blank;
             }
         }
     }
@@ -936,11 +958,19 @@ void update_lcd() {
 
                             //break ? ? ? ??
                         }
-                        if (bullets_pos[bull][0] == i - 1) {
+                    }
+                }
+
+                for (int old_bull = 0; old_bull < 20; old_bull++) {
+                    int old_b_y = old_bullets_pos[old_bull][0];
+                    int old_b_x = old_bullets_pos[old_bull][1];
+                    if (old_b_y != -1 && old_b_x != -1) {
+                        if (old_b_y == i && old_b_x == j) {
                             was_bullet = true;
                         }
                     }
                 }
+
                 if (was_bullet && !is_bullet) {
                     // if it "was" bullet
                     write_map_on_lcd(map[i][j], i, j);
@@ -975,6 +1005,8 @@ void init_lcd() {
     curr_y = player_initial_y;
 
     for (int i = 0; i < 20; ++i) {
+        old_bullets_pos[i][0] = in_active_bullet;
+        old_bullets_pos[i][1] = in_active_bullet;
         bullets_pos[i][0] = in_active_bullet;
         bullets_pos[i][1] = in_active_bullet;
     }
@@ -1368,7 +1400,8 @@ void send_UART(char *string) {
     HAL_RTC_GetTime(&hrtc, &rTime, RTC_FORMAT_BIN);
     HAL_RTC_GetDate(&hrtc, &rDate, RTC_FORMAT_BIN);
     char s[1000] = "";
-    int size = sprintf(s, "%s 20%d-%d-%d  %d:%d:%d\n", string, rDate.Year, rDate.Month, rDate.Date, rTime.Hours,
+    int size = sprintf(s, "%s name:%s 20%d-%d-%d  %d:%d:%d\n", string, name, rDate.Year, rDate.Month, rDate.Date,
+                       rTime.Hours,
                        rTime.Minutes, rTime.Seconds);
     HAL_UART_Transmit_IT(&huart4, s, size);
 
