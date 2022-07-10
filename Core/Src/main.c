@@ -297,8 +297,8 @@ void start_game() {
     rTime.Seconds = 0;
     HAL_RTC_SetTime(&hrtc, &rTime, RTC_FORMAT_BIN);
 
-    rDate.Date = 2;
-    rDate.Month = 13;
+    rDate.Date = 11;
+    rDate.Month = 7;
     rDate.Year = 22;
     HAL_RTC_SetDate(&hrtc, &rDate, RTC_FORMAT_BIN);
 

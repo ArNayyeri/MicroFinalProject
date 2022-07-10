@@ -59,7 +59,8 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 int state_7segment = 0;
-int score = 0;
+int score = 1;
+bool is_10_score = true;
 int difficulty = 0;
 unsigned char data;
 unsigned char buffer[100] = "";
@@ -187,8 +188,8 @@ bool alien_collision = false;
 int map[20][4];
 int old_map[20][4];
 
-const int row_buffer_size = 10;
-int row_buffer[10][4];
+const int row_buffer_size = 8;
+int row_buffer[8][4];
 int buffer_content = 0;
 const int num_of_elements = 6;
 int ps[6][2];
@@ -480,7 +481,9 @@ void SysTick_Handler(void) {
   */
 void EXTI0_IRQHandler(void) {
     /* USER CODE BEGIN EXTI0_IRQn 0 */
-
+    if (status == status_end) {
+        HAL_NVIC_SystemReset();
+    }
     /* USER CODE END EXTI0_IRQn 0 */
     HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
     /* USER CODE BEGIN EXTI0_IRQn 1 */
@@ -495,7 +498,9 @@ void EXTI0_IRQHandler(void) {
   */
 void EXTI3_IRQHandler(void) {
     /* USER CODE BEGIN EXTI3_IRQn 0 */
-
+    if (status == status_end) {
+        HAL_NVIC_SystemReset();
+    }
     /* USER CODE END EXTI3_IRQn 0 */
     HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_3);
     /* USER CODE BEGIN EXTI3_IRQn 1 */
@@ -508,7 +513,9 @@ void EXTI3_IRQHandler(void) {
   */
 void EXTI4_IRQHandler(void) {
     /* USER CODE BEGIN EXTI4_IRQn 0 */
-
+    if (status == status_end) {
+        HAL_NVIC_SystemReset();
+    }
     /* USER CODE END EXTI4_IRQn 0 */
     HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_4);
     /* USER CODE BEGIN EXTI4_IRQn 1 */
@@ -521,7 +528,9 @@ void EXTI4_IRQHandler(void) {
   */
 void EXTI9_5_IRQHandler(void) {
     /* USER CODE BEGIN EXTI9_5_IRQn 0 */
-
+    if (status == status_end) {
+        HAL_NVIC_SystemReset();
+    }
     /* USER CODE END EXTI9_5_IRQn 0 */
     HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_5);
     HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);
@@ -571,7 +580,6 @@ void TIM3_IRQHandler(void) {
 
 
         // bullets gets updated regardless of value of frq_counter
-
         // update bullets position:
         for (int i = 0; i < 20; i++) {
             // if bullet is active, update position
@@ -615,6 +623,8 @@ void TIM3_IRQHandler(void) {
 
             if (wasFalling) {
                 if (map[curr_y + 1][curr_x] == plat) {
+                    // TODO
+                    // this is where the jump starts
                     wasFalling = false;
                     curr_y--;
                     jump = 7;
@@ -622,6 +632,8 @@ void TIM3_IRQHandler(void) {
                         shift_map();
                     }
                 } else if (map[curr_y + 1][curr_x] == spring_plat) {
+                    // TODO
+                    // this is where the jump starts
                     wasFalling = false;
                     curr_y--;
                     jump = 20;
@@ -653,27 +665,33 @@ void TIM3_IRQHandler(void) {
                         //end_game();
                         //return;
                     } else if (map[curr_y + 1][curr_x] == black_hole) {
+                        // TODO
+                        // game over beacuse collision with black hole (add different end screen (animation?))
                         end_game();
                         return;
                     }
 
                     if (curr_y <= half_board) {
-
+                        score++;
                         shift_map();
+                        is_10_score = false;
 
                     } else {
-                        // nothing ? ? ?
-
+                        if (is_10_score)
+                            score++;
                     }
                 } else {
                     //end of jump
+
+                    // TODO
+                    // this is where jumping ends
+                    // (start of falling)
                     wasFalling = true;
                     jump = 0;
                     // anythin else ? ? ?
                     // curr_y++ ? --
                 }
             }
-            score++;
         }
     } else {
         //alien_collision = true
@@ -746,27 +764,14 @@ void TIM6_DAC_IRQHandler(void) {
     /* USER CODE END TIM6_DAC_IRQn 0 */
     HAL_TIM_IRQHandler(&htim6);
     /* USER CODE BEGIN TIM6_DAC_IRQn 1 */
-    if (difficulty == -1) {
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_SET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_10, GPIO_PIN_SET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_SET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_12, GPIO_PIN_SET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_13, GPIO_PIN_SET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_14, GPIO_PIN_SET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, GPIO_PIN_SET);
-        difficulty = -2;
-    } else {
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_10, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_12, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_13, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_14, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, GPIO_PIN_RESET);
-        difficulty = -1;
-    }
+    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_8);
+    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9);
+    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_10);
+    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_11);
+    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_12);
+    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_13);
+    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_14);
+    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_15);
     /* USER CODE END TIM6_DAC_IRQn 1 */
 }
 
@@ -861,7 +866,7 @@ void make_ps(int diff) {
 
     if (diff == 0) {
         ps[0][1] = 3;
-        ps[1][1] = 4;
+        ps[1][1] = 2;
         ps[2][1] = 0;
         ps[3][1] = 0;
         ps[4][1] = 2;
@@ -885,7 +890,7 @@ void fill_buffer(int diff) {
         for (int j = 0; j < num_of_object; j++) {
             int curr_row = -1;
             do {
-                curr_row = (rand() + i * i) % row_buffer_size;
+                curr_row = (rand()) % row_buffer_size;
             } while (row_select_map[curr_row] != -1);
             row_select_map[curr_row] = ps[i][0];
         }
@@ -1164,10 +1169,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
                 right_flag = true;
                 left_flag = false;
                 send_UART("right shift");
-
-
-            } else if (status == status_end) {
-                HAL_NVIC_SystemReset();
             }
             break;
         case 5:
@@ -1330,6 +1331,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
                 strcpy(name, "");
             } else if (status == status_game) {
                 shot_fired = true;
+                send_UART("Shot Fired");
             }
             break;
         case 13:
@@ -1419,7 +1421,6 @@ void end_game() {
     sprintf(string, "Score: %d", score);
     setCursor(3, 1);
     print(string);
-    difficulty = -1;
     HAL_TIM_Base_Start_IT(&htim6);
     setup_melody(starwars_sound, sizeof(starwars_sound));
 }
