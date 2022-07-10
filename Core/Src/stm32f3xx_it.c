@@ -58,6 +58,8 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+# define M_PIl          3.141592653589793238462643383279502884L
+
 int state_7segment = 0;
 int score = 1;
 bool is_10_score = true;
@@ -561,7 +563,7 @@ void TIM3_IRQHandler(void) {
     /* USER CODE END TIM3_IRQn 0 */
     HAL_TIM_IRQHandler(&htim3);
     /* USER CODE BEGIN TIM3_IRQn 1 */
-
+    PWM_Change_Tone(700, 0);
     if (!alien_collision) {
         // shot fired gets checked regardless of frq_counter
         if (shot_fired) {
@@ -623,8 +625,8 @@ void TIM3_IRQHandler(void) {
 
             if (wasFalling) {
                 if (map[curr_y + 1][curr_x] == plat) {
-                    // TODO
                     // this is where the jump starts
+                    PWM_Change_Tone(700, 100);
                     wasFalling = false;
                     curr_y--;
                     jump = 7;
@@ -632,8 +634,8 @@ void TIM3_IRQHandler(void) {
                         shift_map();
                     }
                 } else if (map[curr_y + 1][curr_x] == spring_plat) {
-                    // TODO
                     // this is where the jump starts
+                    PWM_Change_Tone(700, 100);
                     wasFalling = false;
                     curr_y--;
                     jump = 20;
@@ -646,10 +648,11 @@ void TIM3_IRQHandler(void) {
                 } else if (map[curr_y + 1][curr_x] == blank) {
                     curr_y++;
                 } else if (map[curr_y + 1][curr_x] == alien) {
+                    // commented to test sth
                     alien_collision = true;
-                    //end_game();
-                    //return;
+
                 } else if (map[curr_y + 1][curr_x] == black_hole) {
+                    // commented to test sth
                     end_game();
                     return;
                 }
@@ -660,32 +663,34 @@ void TIM3_IRQHandler(void) {
                     // still jumping
                     curr_y--;
 
-                    if (map[curr_y + 1][curr_x] == alien) {
+                    if (map[curr_y][curr_x] == alien) {
+                        // commented to test sth
                         alien_collision = true;
-                        //end_game();
-                        //return;
-                    } else if (map[curr_y + 1][curr_x] == black_hole) {
+
+                    } else if (map[curr_y][curr_x] == black_hole) {
                         // TODO
                         // game over beacuse collision with black hole (add different end screen (animation?))
+
+                        // commented to test sth
                         end_game();
                         return;
                     }
 
                     if (curr_y <= half_board) {
-                        score++;
+                        score += difficulty + 1;
                         shift_map();
                         is_10_score = false;
 
                     } else {
-                        if (is_10_score)
-                            score++;
+                        if (is_10_score && 19 - curr_y > score)
+                            score = (19 - curr_y) * (difficulty + 1);
                     }
                 } else {
                     //end of jump
 
-                    // TODO
                     // this is where jumping ends
                     // (start of falling)
+                    PWM_Change_Tone(400, 100);
                     wasFalling = true;
                     jump = 0;
                     // anythin else ? ? ?
@@ -837,6 +842,12 @@ int get_min(int a, int b) {
     else return a;
 }
 
+double randfrom(double min, double max) {
+    double range = (max - min);
+    double div = RAND_MAX / range;
+    return min + (rand() / div);
+}
+
 void make_ps(int diff) {
     // map values:
     /*
@@ -865,8 +876,8 @@ void make_ps(int diff) {
     }
 
     if (diff == 0) {
-        ps[0][1] = 3;
-        ps[1][1] = 2;
+        ps[0][1] = 2;
+        ps[1][1] = 3;
         ps[2][1] = 0;
         ps[3][1] = 0;
         ps[4][1] = 2;
@@ -896,16 +907,27 @@ void fill_buffer(int diff) {
         }
     }
 
+    double x;
+    double res;
+
+    double amplitude = 2.0;
+
+    double wavelength = randfrom(0.1, 3);
+    double domain = 2 * M_PI * wavelength;
+
     for (int i = 0; i < row_buffer_size; i++) {
-        int rand_col = rand() % 4;
+        x = randfrom(0, domain);
+        int temp = 0;
+        if (i % 2 == 1) temp = (M_PI * wavelength / 2);
+        x = amplitude * sin((x / wavelength) + temp) + amplitude;
+        int alter = ((int) (x * 1000) % 10) / 2.5;
+
         for (int j = 0; j < 4; j++) {
-            if (j == rand_col) {
-                row_buffer[i][j] = row_select_map[i];
-            } else {
-                row_buffer[i][j] = blank;
-            }
+            if (j == alter) row_buffer[i][j] = row_select_map[i];
+            else row_buffer[i][j] = blank;
         }
     }
+
 
     buffer_content = row_buffer_size - 1;
 
