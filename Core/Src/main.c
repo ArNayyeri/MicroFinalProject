@@ -146,6 +146,12 @@ extern unsigned char data;
 extern unsigned char buffer[100];
 extern int position;
 extern unsigned char name[100];
+extern unsigned char plat_char[];
+extern unsigned char broke_plat_char[];
+extern unsigned char spring_plat_char[];
+extern unsigned char black_hole_char[];
+extern unsigned char alien_char[];
+extern unsigned char player_char[];
 
 extern void setup_melody(int melody[], int size_arr);
 /* USER CODE END PV */
@@ -617,7 +623,7 @@ static void MX_TIM3_Init(void) {
 
     /* USER CODE END TIM3_Init 1 */
     htim3.Instance = TIM3;
-    htim3.Init.Prescaler = 700;
+    htim3.Init.Prescaler = 1399;
     htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
     htim3.Init.Period = 9999;
     htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;

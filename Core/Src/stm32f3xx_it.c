@@ -58,7 +58,6 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-# define M_PIl          3.141592653589793238462643383279502884L
 
 int state_7segment = 0;
 int score = 1;
@@ -204,6 +203,7 @@ const int in_active_bullet = -5;
 const int map_m = 20;
 const int map_n = 4;
 const int half_board = 9;
+bool god_mode = false;
 
 void copy_map(int old_map[map_m][map_n], int map[map_m][map_n]) {
     old_x = curr_x;
@@ -622,81 +622,86 @@ void TIM3_IRQHandler(void) {
                 if (new_x > 3) new_x = 0;
                 curr_x = new_x;
             }
-
-            if (wasFalling) {
-                if (map[curr_y + 1][curr_x] == plat) {
-                    // this is where the jump starts
-                    PWM_Change_Tone(700, 100);
-                    wasFalling = false;
-                    curr_y--;
-                    jump = 7;
-                    if (curr_y <= half_board) {
-                        shift_map();
-                    }
-                } else if (map[curr_y + 1][curr_x] == spring_plat) {
-                    // this is where the jump starts
-                    PWM_Change_Tone(700, 100);
-                    wasFalling = false;
-                    curr_y--;
-                    jump = 20;
-                    if (curr_y <= half_board) {
-                        shift_map();
-                    }
-                } else if (map[curr_y + 1][curr_x] == broke_plat) {
-                    map[curr_y + 1][curr_x] = blank;
-                    curr_y++;
-                } else if (map[curr_y + 1][curr_x] == blank) {
-                    curr_y++;
-                } else if (map[curr_y + 1][curr_x] == alien) {
-                    // commented to test sth
-                    alien_collision = true;
-
-                } else if (map[curr_y + 1][curr_x] == black_hole) {
-                    // commented to test sth
-                    end_game();
-                    return;
-                }
+            if (god_mode) {
+                curr_y--;
+                if (curr_y <= half_board) shift_map();
             } else {
-                // wasJumping
-                jump--;
-                if (jump > 0) {
-                    // still jumping
-                    curr_y--;
-
-                    if (map[curr_y][curr_x] == alien) {
+                if (wasFalling) {
+                    if (map[curr_y + 1][curr_x] == plat) {
+                        // this is where the jump starts
+                        PWM_Change_Tone(700, 100);
+                        wasFalling = false;
+                        curr_y--;
+                        jump = 7;
+                        if (curr_y <= half_board) {
+                            shift_map();
+                        }
+                    } else if (map[curr_y + 1][curr_x] == spring_plat) {
+                        // this is where the jump starts
+                        PWM_Change_Tone(700, 100);
+                        wasFalling = false;
+                        curr_y--;
+                        jump = 20;
+                        if (curr_y <= half_board) {
+                            shift_map();
+                        }
+                    } else if (map[curr_y + 1][curr_x] == broke_plat) {
+                        map[curr_y + 1][curr_x] = blank;
+                        curr_y++;
+                    } else if (map[curr_y + 1][curr_x] == blank) {
+                        curr_y++;
+                    } else if (map[curr_y + 1][curr_x] == alien) {
                         // commented to test sth
                         alien_collision = true;
 
-                    } else if (map[curr_y][curr_x] == black_hole) {
-                        // TODO
-                        // game over beacuse collision with black hole (add different end screen (animation?))
-
+                    } else if (map[curr_y + 1][curr_x] == black_hole) {
                         // commented to test sth
                         end_game();
                         return;
                     }
-
-                    if (curr_y <= half_board) {
-                        score += difficulty + 1;
-                        shift_map();
-                        is_10_score = false;
-
-                    } else {
-                        if (is_10_score && 19 - curr_y > score)
-                            score = (19 - curr_y) * (difficulty + 1);
-                    }
                 } else {
-                    //end of jump
+                    // wasJumping
+                    jump--;
+                    if (jump > 0) {
+                        // still jumping
+                        curr_y--;
 
-                    // this is where jumping ends
-                    // (start of falling)
-                    PWM_Change_Tone(400, 100);
-                    wasFalling = true;
-                    jump = 0;
-                    // anythin else ? ? ?
-                    // curr_y++ ? --
+                        if (map[curr_y][curr_x] == alien) {
+                            // commented to test sth
+                            alien_collision = true;
+
+                        } else if (map[curr_y][curr_x] == black_hole) {
+                            // TODO
+                            // game over beacuse collision with black hole (add different end screen (animation?))
+
+                            // commented to test sth
+                            end_game();
+                            return;
+                        }
+
+                        if (curr_y <= half_board) {
+                            score += difficulty + 1;
+                            shift_map();
+                            is_10_score = false;
+
+                        } else {
+                            if (is_10_score && 19 - curr_y > score)
+                                score = (19 - curr_y) * (difficulty + 1);
+                        }
+                    } else {
+                        //end of jump
+
+                        // this is where jumping ends
+                        // (start of falling)
+                        PWM_Change_Tone(400, 100);
+                        wasFalling = true;
+                        jump = 0;
+                        // anythin else ? ? ?
+                        // curr_y++ ? --
+                    }
                 }
             }
+
         }
     } else {
         //alien_collision = true
@@ -740,7 +745,7 @@ void TIM4_IRQHandler(void) {
     /* USER CODE END TIM4_IRQn 0 */
     HAL_TIM_IRQHandler(&htim4);
     /* USER CODE BEGIN TIM4_IRQn 1 */
-    show_number(difficulty * 1000 + score, state_7segment);
+    show_number(difficulty * 1000 + (score % 1000), state_7segment);
     state_7segment = (state_7segment + 1) % 4;
     HAL_ADC_Start_IT(&hadc4);
     /* USER CODE END TIM4_IRQn 1 */
@@ -817,7 +822,7 @@ void shift_map() {
     }
 
     if (buffer_content < 0) {
-        fill_buffer(0);
+        fill_buffer(difficulty);
     }
 
     for (int i = 0; i < 4; i++) {
@@ -876,6 +881,69 @@ void make_ps(int diff) {
     }
 
     if (diff == 0) {
+        ps[0][1] = 1;
+        ps[1][1] = 2;
+        ps[2][1] = 0;
+        ps[3][1] = 5;
+        ps[4][1] = 0;
+        ps[5][1] = 0;
+    } else if (diff == 1) {
+        ps[0][1] = 1;
+        ps[1][1] = 2;
+        ps[2][1] = 1;
+        ps[3][1] = 4;
+        ps[4][1] = 0;
+        ps[5][1] = 0;
+    } else if (diff == 2) {
+        ps[0][1] = 2;
+        ps[1][1] = 2;
+        ps[2][1] = 2;
+        ps[3][1] = 2;
+        ps[4][1] = 0;
+        ps[5][1] = 0;
+    } else if (diff == 3) {
+        ps[0][1] = 3;
+        ps[1][1] = 2;
+        ps[2][1] = 2;
+        ps[3][1] = 1;
+        ps[4][1] = 0;
+        ps[5][1] = 0;
+    } else if (diff == 4) {
+        ps[0][1] = 2;
+        ps[1][1] = 2;
+        ps[2][1] = 3;
+        ps[3][1] = 1;
+        ps[4][1] = 0;
+        ps[5][1] = 0;
+    } else if (diff == 5) {
+        ps[0][1] = 3;
+        ps[1][1] = 2;
+        ps[2][1] = 1;
+        ps[3][1] = 1;
+        ps[4][1] = 0;
+        ps[5][1] = 1;
+    } else if (diff == 6) {
+        ps[0][1] = 3;
+        ps[1][1] = 2;
+        ps[2][1] = 0;
+        ps[3][1] = 1;
+        ps[4][1] = 0;
+        ps[5][1] = 2;
+    } else if (diff == 7) {
+        ps[0][1] = 3;
+        ps[1][1] = 2;
+        ps[2][1] = 0;
+        ps[3][1] = 1;
+        ps[4][1] = 1;
+        ps[5][1] = 1;
+    } else if (diff == 8) {
+        ps[0][1] = 1;
+        ps[1][1] = 2;
+        ps[2][1] = 1;
+        ps[3][1] = 1;
+        ps[4][1] = 1;
+        ps[5][1] = 2;
+    } else if (diff == 9) {
         ps[0][1] = 2;
         ps[1][1] = 3;
         ps[2][1] = 0;
@@ -902,6 +970,7 @@ void fill_buffer(int diff) {
             int curr_row = -1;
             do {
                 curr_row = (rand()) % row_buffer_size;
+                curr_row = (curr_row + 3) % row_buffer_size;
             } while (row_select_map[curr_row] != -1);
             row_select_map[curr_row] = ps[i][0];
         }
@@ -923,14 +992,30 @@ void fill_buffer(int diff) {
         int alter = ((int) (x * 1000) % 10) / 2.5;
 
         for (int j = 0; j < 4; j++) {
-            if (j == alter) row_buffer[i][j] = row_select_map[i];
-            else row_buffer[i][j] = blank;
+            if (j == alter) {
+                if (row_select_map[i] == plat || row_select_map[i] == spring_plat) {
+                    if (i != 0 && row_buffer[i - 1][alter] == black_hole) {
+                        alter++;
+                        if (alter > 3) alter = 0;
+                    }
+                } else {
+                    if (i != 0 && row_buffer[i - 1][alter] != blank) {
+                        // two objact same col
+                        int rand_chance = rand() % 10;
+                        if (rand_chance <= 8) {
+                            // do not allow same column
+                            alter += 2;
+                            alter = alter % 4;
+                        } else {
+                            // allow same column
+                        }
+                    }
+                }
+                row_buffer[i][alter] = row_select_map[i];
+            } else row_buffer[i][j] = blank;
         }
     }
-
-
     buffer_content = row_buffer_size - 1;
-
 }
 
 int get_custom_char_index(int value) {
