@@ -226,6 +226,8 @@ void init_lcd();
 
 void update_lcd();
 
+void end_game_black_hole();
+
 void reset_port_7segment() {
     HAL_GPIO_WritePin(GPIOF, GPIO_PIN_4, 0);
 
@@ -345,7 +347,7 @@ extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim6;
 extern UART_HandleTypeDef huart4;
 /* USER CODE BEGIN EV */
-extern const int player_index, stair_index, broke_stair_index, coil_index, status_start, status_menu,
+extern const int status_start, status_menu,
         status_info, status_game, status_end, status_select_name;
 extern int status;
 extern RTC_TimeTypeDef rTime;
@@ -490,6 +492,8 @@ void EXTI0_IRQHandler(void) {
     HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
     /* USER CODE BEGIN EXTI0_IRQn 1 */
     if (status == status_start) {
+        HAL_TIM_Base_Stop_IT(&htim6);
+        frq_counter = 0;
         show_menu();
     }
     /* USER CODE END EXTI0_IRQn 1 */
@@ -656,6 +660,7 @@ void TIM3_IRQHandler(void) {
 
                     } else if (map[curr_y + 1][curr_x] == black_hole) {
                         // commented to test sth
+                        end_game_black_hole();
                         end_game();
                         return;
                     }
@@ -671,10 +676,10 @@ void TIM3_IRQHandler(void) {
                             alien_collision = true;
 
                         } else if (map[curr_y][curr_x] == black_hole) {
-                            // TODO
-                            // game over beacuse collision with black hole (add different end screen (animation?))
+                            // game over because collision with black hole (add different end screen (animation?))
 
                             // commented to test sth
+                            end_game_black_hole();
                             end_game();
                             return;
                         }
@@ -685,7 +690,7 @@ void TIM3_IRQHandler(void) {
                             is_10_score = false;
 
                         } else {
-                            if (is_10_score && 19 - curr_y > score)
+                            if (is_10_score && (19 - curr_y) * (difficulty + 1) > score)
                                 score = (19 - curr_y) * (difficulty + 1);
                         }
                     } else {
@@ -774,14 +779,71 @@ void TIM6_DAC_IRQHandler(void) {
     /* USER CODE END TIM6_DAC_IRQn 0 */
     HAL_TIM_IRQHandler(&htim6);
     /* USER CODE BEGIN TIM6_DAC_IRQn 1 */
-    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_8);
-    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9);
-    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_10);
-    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_11);
-    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_12);
-    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_13);
-    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_14);
-    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_15);
+    if (status == status_end) {
+        HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_8);
+        HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9);
+        HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_10);
+        HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_11);
+        HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_12);
+        HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_13);
+        HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_14);
+        HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_15);
+        if (curr_y == 0)
+            setCursor(19, 3);
+        else
+            setCursor(curr_y - 1, 3);
+
+        print(" ");
+
+        setCursor(curr_y, 3);
+        write(5);
+
+        if (curr_y == 0)
+            setCursor(0, 0);
+        else
+            setCursor(20 - curr_y, 0);
+
+        print(" ");
+
+        setCursor(19 - curr_y, 0);
+        write(5);
+
+        curr_y = (curr_y + 1) % 20;
+    } else if (status == status_start) {
+        switch (frq_counter) {
+            case 0:
+                setCursor(8, 2);
+                print(" ");
+                setCursor(4, 2);
+                write(5);
+                break;
+            case 1:
+                setCursor(4, 2);
+                print(" ");
+                setCursor(4, 3);
+                write(5);
+                break;
+            case 2:
+                setCursor(4, 3);
+                print(" ");
+                setCursor(6, 2);
+                write(5);
+                break;
+            case 3:
+                setCursor(6, 2);
+                print(" ");
+                setCursor(6, 3);
+                write(5);
+                break;
+            case 4:
+                setCursor(6, 3);
+                print(" ");
+                setCursor(8, 2);
+                write(5);
+                break;
+        }
+        frq_counter = (frq_counter + 1) % 5;
+    }
     /* USER CODE END TIM6_DAC_IRQn 1 */
 }
 
@@ -1122,6 +1184,7 @@ void init_lcd() {
         bullets_pos[i][0] = in_active_bullet;
         bullets_pos[i][1] = in_active_bullet;
     }
+    begin(20, 4);
 
     createChar(0, plat_char);
     createChar(1, broke_plat_char);
@@ -1522,12 +1585,14 @@ void end_game() {
     HAL_TIM_Base_Stop_IT(&htim4);
     reset_port_7segment();
     begin(20, 4);
-    setCursor(3, 0);
-    print(name);
     char string[100] = "";
-    sprintf(string, "Score: %d", score);
+    sprintf(string, "Name: %s", name);
     setCursor(3, 1);
     print(string);
+    sprintf(string, "Score: %d", score);
+    setCursor(3, 2);
+    print(string);
+    curr_y = 0;
     HAL_TIM_Base_Start_IT(&htim6);
     setup_melody(starwars_sound, sizeof(starwars_sound));
 }
@@ -1554,6 +1619,34 @@ void setup_melody(int melody[], int size_arr) {
         HAL_Delay(noteDuration);
 
         PWM_Change_Tone(melody[thisNote], 0);
+    }
+}
+
+void end_game_black_hole() {
+    setCursor(curr_y, curr_x);
+    print("X");
+
+    for (int i = 0; i < 4; ++i) {
+        if (i != curr_x) {
+            setCursor(curr_y, i);
+            print("X");
+        }
+    }
+    int pre_y = curr_y - 1;
+    int next_y = curr_y + 1;
+    while (pre_y >= 0 || next_y < 20) {
+        for (int i = 0; i < 4; ++i) {
+            if (pre_y >= 0) {
+                setCursor(pre_y, i);
+                print("X");
+            }
+            if (next_y < 20) {
+                setCursor(next_y, i);
+                print("X");
+            }
+        }
+        pre_y--;
+        next_y++;
     }
 }
 

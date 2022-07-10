@@ -290,7 +290,7 @@ int super_mario_sound[] = {
 };
 
 //define consts
-const int player_index = 0, stair_index = 1, broke_stair_index = 2, coil_index = 3, status_start = 0, status_menu = 1,
+const int status_start = 0, status_menu = 1,
         status_game = 2, status_info = 3, status_end = 4, status_select_name = 5;
 int status = 0;
 RTC_TimeTypeDef rTime;
@@ -308,8 +308,26 @@ void start_game() {
     rDate.Year = 22;
     HAL_RTC_SetDate(&hrtc, &rDate, RTC_FORMAT_BIN);
 
-    setCursor(4, 1);
+    createChar(0, plat_char);
+    createChar(1, broke_plat_char);
+    createChar(2, spring_plat_char);
+    createChar(3, black_hole_char);
+    createChar(4, alien_char);
+    createChar(5, player_char);
+
+    setCursor(5, 1);
     print("Doodle Jump");
+    setCursor(5, 2);
+    write(0);
+    setCursor(5, 3);
+    write(1);
+    setCursor(7, 2);
+    write(2);
+    setCursor(7, 3);
+    write(3);
+    setCursor(9, 2);
+    write(4);
+    HAL_TIM_Base_Start_IT(&htim6);
     setup_melody(super_mario_sound, sizeof(super_mario_sound));
 
 //    setCursor(4, 2);
